@@ -140,3 +140,109 @@ def test_validate_control_accepts_control_catalog_file(capsys: pytest.CaptureFix
     output = capsys.readouterr().out.lower()
     assert "valid" in output
     assert "control" in output
+
+
+def test_offline_remote_audit_never_calls_github_live_collectors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import repo_assurance.cli as cli_module
+
+    repo = init_repo(tmp_path)
+
+    def fail_live_collection(*args, **kwargs):
+        raise AssertionError("offline audit must not call GitHub live collectors")
+
+    monkeypatch.setattr(cli_module, "_governance_evidence", fail_live_collection)
+    monkeypatch.setattr(cli_module, "_actions_history_evidence", fail_live_collection)
+
+    assert main(["audit", "--repo", str(repo), "--offline"]) == 0
+
+    summary = json.loads(capsys.readouterr().out)
+    report = json.loads(Path(summary["report_json"]).read_text(encoding="utf-8"))
+    assert report["coverage"]["github_governance"] == "UNAVAILABLE"
+    assert report["coverage"]["ci_history"] == "UNAVAILABLE"
+
+
+def test_governance_collection_uses_live_repository_default_branch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import repo_assurance.cli as cli_module
+
+    seen_branches: list[str] = []
+    sha = "a" * 40
+
+    monkeypatch.setattr(
+        cli_module,
+        "collect_repository_state",
+        lambda repository, target_sha: [
+            {
+                "id": "ev_github_repository",
+                "observation": {
+                    "access_state": "AVAILABLE",
+                    "default_branch": "main",
+                },
+            }
+        ],
+    )
+    monkeypatch.setattr(cli_module, "collect_rulesets", lambda repository, target_sha: [])
+    monkeypatch.setattr(
+        cli_module,
+        "collect_default_branch_state",
+        lambda repository, branch, target_sha: (
+            seen_branches.append(branch) or [{"id": "ev_github_default_branch"}]
+        ),
+    )
+    monkeypatch.setattr(cli_module, "collect_commit_checks", lambda repository, target_sha: [])
+
+    cli_module._governance_evidence("acme/demo", "feature/topic", sha)
+
+    assert seen_branches == ["main"]
+
+
+def test_required_check_names_include_active_default_branch_rulesets() -> None:
+    import repo_assurance.cli as cli_module
+
+    governance = [
+        {
+            "id": "ev_github_default_branch",
+            "observation": {
+                "access_state": "AVAILABLE",
+                "required_status_checks": ["classic-check"],
+            },
+        },
+        {
+            "id": "ev_github_rulesets",
+            "observation": {
+                "access_state": "AVAILABLE",
+                "rulesets": [
+                    {
+                        "enforcement": "active",
+                        "target": "branch",
+                        "conditions": {
+                            "ref_name": {
+                                "include": ["~DEFAULT_BRANCH"],
+                                "exclude": [],
+                            }
+                        },
+                        "rules": [
+                            {
+                                "type": "required_status_checks",
+                                "parameters": {
+                                    "required_status_checks": [
+                                        {"context": "ruleset-check"}
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                ],
+            },
+        },
+    ]
+
+    assert cli_module._required_check_names(governance) == {
+        "classic-check",
+        "ruleset-check",
+    }
