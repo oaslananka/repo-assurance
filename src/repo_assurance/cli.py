@@ -146,10 +146,26 @@ def _build_plan(repo: Path, *, target: str | None, mode: str) -> tuple[dict[str,
 
 
 def _governance_evidence(repository: str, branch: str, sha: str) -> list[dict[str, Any]]:
+    repository_state = collect_repository_state(repository, sha)
+    default_branch: str | None = None
+    if repository_state:
+        observation = repository_state[0].get("observation")
+        if (
+            isinstance(observation, Mapping)
+            and observation.get("access_state") == "AVAILABLE"
+            and observation.get("default_branch")
+        ):
+            default_branch = str(observation["default_branch"])
+
+    branch_state = (
+        collect_default_branch_state(repository, default_branch, sha)
+        if default_branch
+        else []
+    )
     return [
-        *collect_repository_state(repository, sha),
+        *repository_state,
         *collect_rulesets(repository, sha),
-        *collect_default_branch_state(repository, branch, sha),
+        *branch_state,
         *collect_commit_checks(repository, sha),
     ]
 
@@ -210,11 +226,53 @@ def _actions_history_evidence(
 def _required_check_names(governance: Sequence[Mapping[str, Any]]) -> set[str]:
     names: set[str] = set()
     for item in governance:
-        if item.get("id") != "ev_github_default_branch":
-            continue
         observation = item.get("observation")
-        if isinstance(observation, Mapping):
-            names.update(str(value) for value in observation.get("required_status_checks", []) if value)
+        if not isinstance(observation, Mapping) or observation.get("access_state") != "AVAILABLE":
+            continue
+
+        if item.get("id") == "ev_github_default_branch":
+            names.update(
+                str(value)
+                for value in observation.get("required_status_checks", [])
+                if value
+            )
+            continue
+
+        if item.get("id") != "ev_github_rulesets":
+            continue
+        rulesets = observation.get("rulesets")
+        if not isinstance(rulesets, list):
+            continue
+        for ruleset in rulesets:
+            if not isinstance(ruleset, Mapping):
+                continue
+            if ruleset.get("enforcement") != "active" or ruleset.get("target") != "branch":
+                continue
+            conditions = ruleset.get("conditions")
+            if not isinstance(conditions, Mapping):
+                continue
+            ref_name = conditions.get("ref_name")
+            if not isinstance(ref_name, Mapping):
+                continue
+            includes = ref_name.get("include") or []
+            excludes = ref_name.get("exclude") or []
+            if "~DEFAULT_BRANCH" not in includes or "~DEFAULT_BRANCH" in excludes:
+                continue
+            rules = ruleset.get("rules")
+            if not isinstance(rules, list):
+                continue
+            for rule in rules:
+                if not isinstance(rule, Mapping) or rule.get("type") != "required_status_checks":
+                    continue
+                parameters = rule.get("parameters")
+                if not isinstance(parameters, Mapping):
+                    continue
+                required = parameters.get("required_status_checks")
+                if not isinstance(required, list):
+                    continue
+                for check in required:
+                    if isinstance(check, Mapping) and check.get("context"):
+                        names.add(str(check["context"]))
     return names
 
 
@@ -277,7 +335,7 @@ def _audit(
             )
         )
 
-    if repository.get("owner") != "local":
+    if repository.get("owner") != "local" and not offline:
         governance = _governance_evidence(full_name, target_branch, target_sha)
         evidence.extend(governance)
         control_results.extend(evaluate_governance(governance))
