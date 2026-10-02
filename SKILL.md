@@ -27,7 +27,7 @@ Canonical execution:
 repo-assurance audit --repo <path> --mode standard
 ```
 
-Use `quick` for triage and `deep` only when broader dynamic/current evidence is justified. Use `--offline` when external current-baseline resolution is unavailable; do not substitute model memory for current facts.
+Use `quick` for triage and `deep` only when broader dynamic/current evidence is justified. Use `--offline` when GitHub live/API collection or external current-baseline resolution must be skipped; the resulting GitHub/CI-history domains remain unavailable or partial rather than being treated as clean. Do not substitute model memory for current facts.
 
 ## Bounded claims
 
