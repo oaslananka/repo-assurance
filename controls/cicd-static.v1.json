@@ -1,0 +1,201 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "cicd-static",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "CI-STATIC-001",
+      "title": "Workflow syntax and semantics are valid",
+      "domain": "cicd-static",
+      "description": "Workflow syntax and semantics are valid.",
+      "evaluator": "cicd_static.workflow_validity",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-STATIC-003",
+      "title": "Workflow token permissions are least privilege",
+      "domain": "cicd-static",
+      "description": "Workflow token permissions are least privilege.",
+      "evaluator": "cicd_static.permissions",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-STATIC-004",
+      "title": "Third-party action references are classified",
+      "domain": "cicd-static",
+      "description": "Third-party action references are classified.",
+      "evaluator": "cicd_static.action_refs",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-STATIC-006",
+      "title": "False-green workflow patterns are evaluated",
+      "domain": "cicd-static",
+      "description": "False-green workflow patterns are evaluated.",
+      "evaluator": "cicd_static.false_green",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-STATIC-008",
+      "title": "Runner lifecycle baseline is evaluated",
+      "domain": "cicd-static",
+      "description": "Runner lifecycle baseline is evaluated.",
+      "evaluator": "cicd_static.runner_baseline",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}

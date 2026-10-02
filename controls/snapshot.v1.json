@@ -1,0 +1,159 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "snapshot",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "SNAP-001",
+      "title": "Repository identity is established",
+      "domain": "snapshot",
+      "description": "Repository identity is established.",
+      "evaluator": "snapshot.repository_identity",
+      "applicability": {
+        "all_capabilities": [
+          "local_git"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "SNAP-002",
+      "title": "Immutable target commit is established",
+      "domain": "snapshot",
+      "description": "Immutable target commit is established.",
+      "evaluator": "snapshot.immutable_commit",
+      "applicability": {
+        "all_capabilities": [
+          "local_git"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "SNAP-003",
+      "title": "Local and remote drift is classified",
+      "domain": "snapshot",
+      "description": "Local and remote drift is classified.",
+      "evaluator": "snapshot.local_remote_drift",
+      "applicability": {
+        "all_capabilities": [
+          "local_git",
+          "github"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "SNAP-004",
+      "title": "Working tree state is recorded",
+      "domain": "snapshot",
+      "description": "Working tree state is recorded.",
+      "evaluator": "snapshot.dirty_workspace",
+      "applicability": {
+        "all_capabilities": [
+          "local_git"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}

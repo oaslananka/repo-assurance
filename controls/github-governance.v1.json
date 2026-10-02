@@ -1,0 +1,162 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "github-governance",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "GH-GOV-001",
+      "title": "Effective default branch rules are evaluated",
+      "domain": "github-governance",
+      "description": "Effective default branch rules are evaluated.",
+      "evaluator": "governance.default_branch_rules",
+      "applicability": {
+        "all_capabilities": [
+          "github",
+          "rulesets"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "GH-GOV-003",
+      "title": "Required status checks are evaluated",
+      "domain": "github-governance",
+      "description": "Required status checks are evaluated.",
+      "evaluator": "governance.required_checks",
+      "applicability": {
+        "all_capabilities": [
+          "github",
+          "rulesets",
+          "github_actions"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "GH-GOV-007",
+      "title": "Ruleset bypass exposure is evaluated",
+      "domain": "github-governance",
+      "description": "Ruleset bypass exposure is evaluated.",
+      "evaluator": "governance.bypass_exposure",
+      "applicability": {
+        "all_capabilities": [
+          "github",
+          "rulesets"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "GH-GOV-008",
+      "title": "Merged branch cleanup policy is observed",
+      "domain": "github-governance",
+      "description": "Merged branch cleanup policy is observed.",
+      "evaluator": "governance.auto_delete_branches",
+      "applicability": {
+        "all_capabilities": [
+          "github"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}
