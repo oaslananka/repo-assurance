@@ -50,7 +50,7 @@ Run a read-only audit:
 repo-assurance audit --repo . --mode standard
 ```
 
-Offline audit, with no current external baseline assumptions:
+Offline audit, using local/static evidence only and skipping GitHub live/API collection and current external baseline resolution:
 
 ```bash
 repo-assurance audit --repo . --mode standard --offline
