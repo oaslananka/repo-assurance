@@ -1,0 +1,28 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "repo-assurance",
+  "version": "0.1.1",
+  "description": "Evidence-driven, read-only repository assurance for local Git repositories and GitHub live state.",
+  "author": {
+    "name": "oaslananka"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Repo Assurance",
+        "shortDescription": "Evidence-driven repo audits",
+        "longDescription": "Audit repository state, GitHub governance, CI/CD reliability, and local branch/worktree preservation risks using evidence-grounded read-only controls.",
+        "developerName": "oaslananka",
+        "category": "Productivity",
+        "capabilities": [
+          "Interactive"
+        ],
+        "defaultPrompt": [
+          "Audit this repository in standard mode and explain the highest-priority findings.",
+          "Check this repository for CI/CD and GitHub governance gaps without changing anything.",
+          "Review stale branches, worktrees, and local-only work before recommending cleanup."
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "title",
+    "domain",
+    "description",
+    "applicability",
+    "evidence_requirements",
+    "evaluation",
+    "outputs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "control/v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9]+(?:-[A-Z0-9]+)+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluator": {
+      "type": "string"
+    },
+    "applicability": {
+      "type": "object",
+      "properties": {
+        "all_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "any_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "excluded_repository_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence_requirements": {
+      "type": "object",
+      "required": [
+        "minimum_kinds",
+        "minimum_items"
+      ],
+      "properties": {
+        "minimum_kinds": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "source",
+              "git_state",
+              "github_state",
+              "github_history",
+              "execution",
+              "provider_state",
+              "dependency_state",
+              "external_current",
+              "inference",
+              "user_declared"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "minimum_items": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluation": {
+      "type": "object",
+      "required": [
+        "time_sensitive",
+        "correlation_required",
+        "dynamic_execution"
+      ],
+      "properties": {
+        "time_sensitive": {
+          "type": "boolean"
+        },
+        "correlation_required": {
+          "type": "boolean"
+        },
+        "dynamic_execution": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputs": {
+      "type": "object",
+      "required": [
+        "allowed_states"
+      ],
+      "properties": {
+        "allowed_states": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "PASS",
+              "FINDING",
+              "NOT_APPLICABLE",
+              "NOT_ENABLED",
+              "UNAVAILABLE",
+              "UNKNOWN_PERMISSION",
+              "UNKNOWN_ERROR",
+              "INCONCLUSIVE"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

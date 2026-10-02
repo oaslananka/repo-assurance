@@ -1,0 +1,281 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "cicd-operational",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "CI-OPS-001",
+      "title": "Workflow execution freshness is evaluated",
+      "domain": "cicd-operational",
+      "description": "Workflow execution freshness is evaluated.",
+      "evaluator": "cicd_operational.execution_freshness",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "workflow_history"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_history"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-OPS-002",
+      "title": "Workflow outcome distribution is summarized",
+      "domain": "cicd-operational",
+      "description": "Workflow outcome distribution is summarized.",
+      "evaluator": "cicd_operational.outcome_distribution",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "workflow_history"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_history"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-OPS-003",
+      "title": "Chronic workflow failure is detected",
+      "domain": "cicd-operational",
+      "description": "Chronic workflow failure is detected.",
+      "evaluator": "cicd_operational.chronic_failure",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "workflow_history"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_history"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-OPS-005",
+      "title": "Flaky workflow execution is detected",
+      "domain": "cicd-operational",
+      "description": "Flaky workflow execution is detected.",
+      "evaluator": "cicd_operational.flakiness",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "workflow_history"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_history"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-OPS-006",
+      "title": "Required unreliable gates are detected",
+      "domain": "cicd-operational",
+      "description": "Required unreliable gates are detected.",
+      "evaluator": "cicd_operational.unreliable_gate",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "workflow_history",
+          "rulesets"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_history"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-OPS-007",
+      "title": "Healthy but unenforced controls are detected",
+      "domain": "cicd-operational",
+      "description": "Healthy but unenforced controls are detected.",
+      "evaluator": "cicd_operational.unenforced_check",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "workflow_history",
+          "rulesets"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_history"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "CI-OPS-008",
+      "title": "Dead or skipped jobs are detected",
+      "domain": "cicd-operational",
+      "description": "Dead or skipped jobs are detected.",
+      "evaluator": "cicd_operational.dead_job",
+      "applicability": {
+        "all_capabilities": [
+          "github_actions",
+          "workflow_history"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "github_history"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": true,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}

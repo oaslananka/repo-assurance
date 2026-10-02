@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "fingerprint",
+    "control_ids",
+    "title",
+    "domain",
+    "type",
+    "output_class",
+    "severity",
+    "confidence",
+    "priority",
+    "lifecycle",
+    "subject",
+    "observed",
+    "expected",
+    "impact",
+    "evidence_ids",
+    "root_cause",
+    "remediation",
+    "verification",
+    "relationships"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "finding/v1"
+    },
+    "id": {
+      "type": "string"
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "control_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "output_class": {
+      "enum": [
+        "FINDING",
+        "OBSERVATION",
+        "EVIDENCE_GAP"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "INFO"
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "CONFIRMED",
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ]
+    },
+    "priority": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4"
+      ]
+    },
+    "lifecycle": {
+      "enum": [
+        "OPEN",
+        "ACCEPTED_RISK",
+        "DEFERRED",
+        "FALSE_POSITIVE",
+        "RESOLVED"
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "type",
+        "identifier"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "repository",
+            "branch",
+            "local_branch",
+            "worktree",
+            "stash",
+            "commit",
+            "file",
+            "workflow",
+            "github_workflow",
+            "github_job",
+            "github_check",
+            "ruleset",
+            "pull_request",
+            "issue",
+            "dependency",
+            "provider",
+            "provider_check",
+            "runtime"
+          ]
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "qualifiers": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "observed": {
+      "type": "object",
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "impact": {
+      "type": "object",
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "root_cause": {
+      "type": "object",
+      "required": [
+        "state",
+        "summary"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "CONFIRMED",
+            "SUSPECTED",
+            "UNKNOWN"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "remediation": {
+      "type": "object",
+      "required": [
+        "summary",
+        "effort"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "effort": {
+          "enum": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "baseline_as_of": {
+      "type": "string"
+    },
+    "relationships": {
+      "type": "object",
+      "required": [
+        "caused_by",
+        "related_to",
+        "duplicates",
+        "blocked_by",
+        "blocks"
+      ],
+      "properties": {
+        "caused_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "related_to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "duplicates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "blocked_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

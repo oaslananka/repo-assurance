@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "kind",
+    "source",
+    "subject",
+    "observation",
+    "snapshot",
+    "collected_at",
+    "visibility"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "evidence/v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": [
+        "source",
+        "git_state",
+        "github_state",
+        "github_history",
+        "execution",
+        "provider_state",
+        "dependency_state",
+        "external_current",
+        "inference",
+        "user_declared"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "provider",
+        "mechanism",
+        "collector"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "mechanism": {
+          "type": "string"
+        },
+        "collector": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "type",
+        "identifier"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "repository",
+            "branch",
+            "local_branch",
+            "worktree",
+            "stash",
+            "commit",
+            "file",
+            "workflow",
+            "github_workflow",
+            "github_job",
+            "github_check",
+            "ruleset",
+            "pull_request",
+            "issue",
+            "dependency",
+            "provider",
+            "provider_check",
+            "runtime"
+          ]
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "qualifiers": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object"
+    },
+    "snapshot": {
+      "type": "object",
+      "required": [
+        "repository",
+        "target_commit_sha"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "target_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{40,64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "collected_at": {
+      "type": "string"
+    },
+    "freshness": {
+      "type": "object",
+      "properties": {
+        "time_sensitive": {
+          "type": "boolean"
+        },
+        "valid_as_of": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "visibility": {
+      "type": "object",
+      "required": [
+        "completeness",
+        "permission_limited",
+        "retention_limited"
+      ],
+      "properties": {
+        "completeness": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        },
+        "permission_limited": {
+          "type": "boolean"
+        },
+        "retention_limited": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "integrity": {
+      "type": "object"
+    },
+    "provenance": {
+      "type": "object"
+    },
+    "redactions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "lineage": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

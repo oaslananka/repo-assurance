@@ -1,0 +1,120 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "repository",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "REPO-001",
+      "title": "Repository type is classified",
+      "domain": "repository",
+      "description": "Repository type is classified.",
+      "evaluator": "repository.classification",
+      "applicability": {
+        "all_capabilities": [
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "REPO-002",
+      "title": "Language and ecosystem inventory is established",
+      "domain": "repository",
+      "description": "Language and ecosystem inventory is established.",
+      "evaluator": "repository.ecosystem_inventory",
+      "applicability": {
+        "all_capabilities": [
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "REPO-003",
+      "title": "Build and test commands are discovered",
+      "domain": "repository",
+      "description": "Build and test commands are discovered.",
+      "evaluator": "repository.command_discovery",
+      "applicability": {
+        "all_capabilities": [
+          "filesystem"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "source"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}

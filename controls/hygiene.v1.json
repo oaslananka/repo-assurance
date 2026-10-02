@@ -1,0 +1,237 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "hygiene",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "HYGIENE-001",
+      "title": "Integrated stale remote branches are identified",
+      "domain": "hygiene",
+      "description": "Integrated stale remote branches are identified.",
+      "evaluator": "hygiene.integrated_stale_branch",
+      "applicability": {
+        "all_capabilities": [
+          "local_git",
+          "github"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "HYGIENE-003",
+      "title": "Local branches without upstream are classified",
+      "domain": "hygiene",
+      "description": "Local branches without upstream are classified.",
+      "evaluator": "hygiene.local_without_upstream",
+      "applicability": {
+        "all_capabilities": [
+          "local_git"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "HYGIENE-004",
+      "title": "Deleted remote branches with surviving local work are detected",
+      "domain": "hygiene",
+      "description": "Deleted remote branches with surviving local work are detected.",
+      "evaluator": "hygiene.deleted_remote_local_work",
+      "applicability": {
+        "all_capabilities": [
+          "local_git",
+          "github"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "HYGIENE-005",
+      "title": "Dirty dormant worktrees are detected",
+      "domain": "hygiene",
+      "description": "Dirty dormant worktrees are detected.",
+      "evaluator": "hygiene.dirty_dormant_worktree",
+      "applicability": {
+        "all_capabilities": [
+          "local_git",
+          "local_worktrees"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "HYGIENE-008",
+      "title": "Detached HEAD unique work is detected",
+      "domain": "hygiene",
+      "description": "Detached HEAD unique work is detected.",
+      "evaluator": "hygiene.detached_unique_work",
+      "applicability": {
+        "all_capabilities": [
+          "local_git"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "HYGIENE-010",
+      "title": "Lost work preservation risks are summarized",
+      "domain": "hygiene",
+      "description": "Lost work preservation risks are summarized.",
+      "evaluator": "hygiene.lost_work_detector",
+      "applicability": {
+        "all_capabilities": [
+          "local_git"
+        ],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": [
+          "git_state"
+        ],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS",
+          "FINDING",
+          "NOT_APPLICABLE",
+          "NOT_ENABLED",
+          "UNAVAILABLE",
+          "UNKNOWN_PERMISSION",
+          "UNKNOWN_ERROR",
+          "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}
