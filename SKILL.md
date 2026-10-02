@@ -39,6 +39,12 @@ Map inaccessible or incomplete surfaces to explicit states such as `UNKNOWN_PERM
 
 Do not maximize tool count. Recommend a new provider only when it is available/entitled, applicable to this repository, covers a material gap, adds meaningful incremental assurance, and has acceptable operational noise or cost. Overlap is not automatically redundancy.
 
+## Snapshot and execution provenance
+
+- **Never mix commits into one audit snapshot.** Every finding must retain the exact commit SHA that supplied its source evidence. Cross-branch comparisons are separate observations and must name each branch/SHA explicitly.
+- **MCP/engine availability is part of provenance.** If the Repo Assurance MCP tools are unavailable, do not present the result as a canonical `quick`, `standard`, or `deep` engine execution. Label it as a **partial skill-guided audit**, identify which engine-backed controls were not executed, and keep their coverage unavailable/partial.
+- For time-sensitive controls, use current authoritative evidence (official documentation, changelog, advisory, or registry data) and pass normalized `baseline-evidence/v1` items to `audit_repository` when the tool is available. If current evidence cannot be verified, keep the control inconclusive.
+
 ## Common mistakes
 
 | Mistake | Correct behavior |

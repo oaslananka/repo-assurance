@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "repo-assurance"
-version = "0.0.1"
+version = "0.1.1"
 description = "Evidence-driven repository assurance orchestrator"
 requires-python = ">=3.12"
 dependencies = ["jsonschema>=4.23,<5"]

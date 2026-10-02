@@ -24,6 +24,12 @@ Use the Repo Assurance MCP tools as the executable source of truth. The workflow
 - Do not claim "no vulnerabilities exist" merely because no alerts were visible.
 - Do not expose raw secret values. The canonical audit report is the preferred result surface.
 
+## Snapshot and execution provenance
+
+- **Never mix commits into one audit snapshot.** Every finding must retain the exact commit SHA that supplied its source evidence. Cross-branch comparisons are separate observations and must name each branch/SHA explicitly.
+- **MCP/engine availability is part of provenance.** If the Repo Assurance MCP tools are unavailable, do not present the result as a canonical `quick`, `standard`, or `deep` engine execution. Label it as a **partial skill-guided audit**, identify which engine-backed controls were not executed, and keep their coverage unavailable/partial.
+- For time-sensitive controls, use current authoritative evidence (official documentation, changelog, advisory, or registry data) and pass normalized `baseline-evidence/v1` items to `audit_repository` when the tool is available. If current evidence cannot be verified, keep the control inconclusive.
+
 ## Local runtime
 
 The local MCP server requires Python 3.12+ and the plugin extra installed in the plugin source/runtime environment:

@@ -110,3 +110,15 @@ python scripts/build_plugin.py
 The package contains `plugin.json`, `mcp.json`, the repository-assurance skill, and the read-only Python MCP adapter. The MCP server exposes `discover_repository`, `plan_repository_audit`, `audit_repository`, and `render_audit_report`; it does not expose arbitrary shell execution or remediation/mutation tools.
 
 Local filesystem access requires a host that can launch the stdio MCP process (for example ChatGPT Desktop). Saving the package to a ChatGPT account does not by itself grant local filesystem access on web or mobile.
+
+### Immutable source evidence
+
+Repository profile and workflow-source controls read from the audited Git object (`<target SHA>:<path>`), not from the current checkout. Dirty working-tree state remains separate drift evidence and is never relabeled as target-SHA source evidence.
+
+For current-sensitive controls, authoritative baseline evidence can be supplied explicitly:
+
+```bash
+repo-assurance audit --repo . --baseline-evidence /path/to/baselines.json
+```
+
+`baselines.json` is a `baseline-evidence/v1` object or list. Missing or stale current evidence remains `INCONCLUSIVE`; the engine does not substitute model memory.

@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from repo_assurance.collectors.baseline import (
+    load_baseline_evidence,
+    match_baseline_request,
+)
 from repo_assurance.collectors.filesystem import (
     collect_repository_profile_evidence,
     collect_workflow_sources,
@@ -37,11 +41,15 @@ from repo_assurance.core.planner import RepositoryCapabilities, build_audit_plan
 from repo_assurance.core.remediation import build_remediation_tracks
 from repo_assurance.core.schema import validate_document
 from repo_assurance.evaluators.cicd_operational import evaluate_ci_operational
-from repo_assurance.evaluators.cicd_static import evaluate_ci_static
+from repo_assurance.evaluators.cicd_static import (
+    build_runner_baseline_requests,
+    evaluate_ci_static,
+)
 from repo_assurance.evaluators.governance import evaluate_governance
 from repo_assurance.evaluators.hygiene import evaluate_hygiene
 from repo_assurance.evaluators.repository import (
     discover_repository_profile,
+    discover_repository_profile_at_commit,
     evaluate_repository_profile,
 )
 from repo_assurance.evaluators.snapshot import evaluate_snapshot
@@ -117,8 +125,8 @@ def _discover(repo: Path, target: str | None) -> dict[str, Any]:
     )
     target_ref = str(snapshot_observation["target_ref"])
     repository = _identity_metadata(identity, repo)
-    profile = discover_repository_profile(repo)
     snapshot = _snapshot_metadata(snapshot_evidence, target_ref)
+    profile = discover_repository_profile_at_commit(repo, snapshot["target_commit_sha"])
     return {
         "repository": repository,
         "snapshot": snapshot,
@@ -287,6 +295,33 @@ def _blind_spots(coverage: Mapping[str, str]) -> list[dict[str, str]]:
     ]
 
 
+
+
+def _resolve_runner_baselines(
+    workflow_sources: Sequence[Mapping[str, Any]],
+    supplied_evidence: Sequence[Mapping[str, Any]],
+    *,
+    as_of: datetime,
+    max_age_days: int = 7,
+) -> list[dict[str, Any]]:
+    """Match supplied authoritative evidence to runner lifecycle requests."""
+    if not supplied_evidence:
+        return []
+    resolved: list[dict[str, Any]] = []
+    for request in build_runner_baseline_requests(workflow_sources):
+        match = match_baseline_request(
+            request,
+            supplied_evidence,
+            as_of=as_of,
+            max_age_days=max_age_days,
+        )
+        if match is not None:
+            item = dict(match)
+            validate_document("baseline-evidence.v1", item)
+            resolved.append(item)
+    return resolved
+
+
 def _audit(
     repo: Path,
     *,
@@ -296,6 +331,7 @@ def _audit(
     max_runs: int | None,
     offline: bool,
     no_current_baseline: bool,
+    baseline_evidence: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
     started_at = _now()
     plan, discovery = _build_plan(repo, target=target, mode=mode)
@@ -328,10 +364,17 @@ def _audit(
     )
     evidence.extend(workflow_sources)
     if profile.get("github_actions"):
+        resolved_baselines = []
+        if not no_current_baseline:
+            resolved_baselines = _resolve_runner_baselines(
+                workflow_sources,
+                baseline_evidence,
+                as_of=datetime.now(timezone.utc),
+            )
         control_results.extend(
             evaluate_ci_static(
                 workflow_sources,
-                baseline_evidence=[] if (offline or no_current_baseline) else [],
+                baseline_evidence=resolved_baselines,
             )
         )
 
@@ -469,6 +512,7 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--max-runs", type=int)
     audit.add_argument("--offline", action="store_true")
     audit.add_argument("--no-current-baseline", action="store_true")
+    audit.add_argument("--baseline-evidence", type=Path, help="JSON baseline-evidence/v1 object or list from authoritative current sources")
     audit.add_argument("--debug-evidence", action="store_true")
     audit.add_argument("--format", choices=["json", "markdown", "both"], default="both")
 
@@ -514,6 +558,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "audit":
         repo = args.repo.resolve()
+        supplied_baseline_evidence = (
+            load_baseline_evidence(args.baseline_evidence)
+            if args.baseline_evidence is not None
+            else []
+        )
         plan, report, evidence = _audit(
             repo,
             target=args.target,
@@ -522,6 +571,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_runs=args.max_runs,
             offline=args.offline,
             no_current_baseline=args.no_current_baseline,
+            baseline_evidence=supplied_baseline_evidence,
         )
         output_dir = args.output.resolve() if args.output else Path(tempfile.mkdtemp(prefix="repo-assurance-"))
         summary = _write_audit_outputs(

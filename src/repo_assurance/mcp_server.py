@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, Sequence
 
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
@@ -48,8 +48,9 @@ def audit_repository(
     offline: bool = False,
     history_days: int | None = None,
     max_runs: int | None = None,
+    baseline_evidence: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
-    """Run a read-only repository assurance audit. Set offline=true to disable GitHub live-state access."""
+    """Run a read-only audit. Current-sensitive evidence may be supplied from authoritative sources."""
     return _audit_repository(
         repo_path,
         target=target,
@@ -57,6 +58,7 @@ def audit_repository(
         offline=offline,
         history_days=history_days,
         max_runs=max_runs,
+        baseline_evidence=baseline_evidence,
     )
 
 

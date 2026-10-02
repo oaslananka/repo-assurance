@@ -63,6 +63,7 @@ class ReadOnlyCommandRunner:
             "merge-base",
             "for-each-ref",
             "ls-files",
+            "ls-tree",
             "cat-file",
             "rev-list",
         }

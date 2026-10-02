@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from repo_assurance.collectors.filesystem import list_commit_paths, read_commit_text
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.12+ invariant
@@ -182,6 +184,113 @@ def discover_repository_profile(repo: Path) -> dict[str, object]:
         "test_command_candidates": sorted(set(test_commands)),
     }
 
+
+
+
+def discover_repository_profile_at_commit(repo: Path, target_commit_sha: str) -> dict[str, object]:
+    """Discover repository profile strictly from the immutable target Git tree."""
+    paths = list_commit_paths(repo, target_commit_sha)
+    path_set = set(paths)
+
+    package_json: dict[str, Any] | None = None
+    package_text = read_commit_text(repo, target_commit_sha, "package.json") if "package.json" in path_set else None
+    if package_text is not None:
+        try:
+            payload = json.loads(package_text)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            package_json = payload
+
+    pyproject: dict[str, Any] | None = None
+    pyproject_text = read_commit_text(repo, target_commit_sha, "pyproject.toml") if "pyproject.toml" in path_set else None
+    if pyproject_text is not None and tomllib is not None:
+        try:
+            payload = tomllib.loads(pyproject_text)
+        except tomllib.TOMLDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            pyproject = payload
+
+    def ignored(relative: str) -> bool:
+        parts = Path(relative).parts
+        return any(part in _IGNORED_DIRS for part in parts[:-1])
+
+    languages = sorted({
+        language
+        for relative in paths
+        if not ignored(relative)
+        if (language := _LANGUAGE_SUFFIXES.get(Path(relative).suffix.lower())) is not None
+    })
+
+    lockfiles = sorted(
+        name
+        for name in ("package-lock.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "uv.lock", "Pipfile.lock")
+        if name in path_set
+    )
+
+    package_managers: set[str] = set()
+    node_manager: str | None = None
+    if package_json is not None:
+        if "pnpm-lock.yaml" in path_set:
+            node_manager = "pnpm"
+        elif "yarn.lock" in path_set:
+            node_manager = "yarn"
+        else:
+            node_manager = "npm"
+        package_managers.add(node_manager)
+    if pyproject is not None or "requirements.txt" in path_set:
+        package_managers.add("python")
+
+    build_commands: list[str] = []
+    test_commands: list[str] = []
+    if pyproject is not None:
+        if "build-system" in pyproject:
+            build_commands.append("python -m build")
+        tool = pyproject.get("tool")
+        has_tests = any(path == "tests" or path.startswith("tests/") for path in paths)
+        if isinstance(tool, dict) and "pytest" in tool:
+            test_commands.append("pytest")
+        elif has_tests:
+            test_commands.append("pytest")
+
+    if package_json is not None and node_manager is not None:
+        scripts = package_json.get("scripts")
+        if isinstance(scripts, dict):
+            if "build" in scripts:
+                build_commands.append(f"{node_manager} run build")
+            if "test" in scripts:
+                test_commands.append("npm test" if node_manager == "npm" else f"{node_manager} test")
+
+    has_python = pyproject is not None or "python" in languages
+    has_node = package_json is not None or any(lang in languages for lang in ("javascript", "typescript"))
+    if has_python and has_node:
+        repository_type = "mixed"
+    elif "action.yml" in path_set or "action.yaml" in path_set:
+        repository_type = "github_action"
+    elif package_json and package_json.get("bin"):
+        repository_type = "cli"
+    elif not languages:
+        repository_type = "documentation" if any(path.endswith(".md") for path in paths) else "unknown"
+    elif has_python or has_node:
+        repository_type = "library"
+    else:
+        repository_type = "unknown"
+
+    github_actions = any(
+        path.startswith(".github/workflows/") and Path(path).suffix.lower() in {".yml", ".yaml"}
+        for path in paths
+    )
+
+    return {
+        "repository_type": repository_type,
+        "languages": languages,
+        "package_managers": sorted(package_managers),
+        "lockfiles": lockfiles,
+        "github_actions": github_actions,
+        "build_command_candidates": sorted(set(build_commands)),
+        "test_command_candidates": sorted(set(test_commands)),
+    }
 
 def evaluate_repository_profile(profile_evidence: dict[str, Any]) -> list[dict[str, Any]]:
     from datetime import datetime, timezone

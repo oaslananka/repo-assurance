@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 from repo_assurance.core.schema import validate_document
 from repo_assurance.security.redaction import sanitize_evidence
+from repo_assurance.security.mutation_guard import ReadOnlyCommandRunner
 
 
 def _now() -> str:
@@ -51,6 +52,47 @@ def _evidence(
     return sanitized
 
 
+
+
+class SourceSnapshotError(RuntimeError):
+    """Raised when immutable source content cannot be read from Git objects."""
+
+
+def list_commit_paths(
+    repo: Path,
+    target_commit_sha: str,
+    *,
+    runner: ReadOnlyCommandRunner | None = None,
+) -> list[str]:
+    transport = runner or ReadOnlyCommandRunner()
+    result = transport.run(
+        ["git", "ls-tree", "-r", "--name-only", "--full-tree", target_commit_sha],
+        cwd=repo,
+    )
+    if result.returncode != 0:
+        raise SourceSnapshotError(
+            result.stderr.strip() or f"unable to list source tree for {target_commit_sha}"
+        )
+    return sorted(line for line in result.stdout.splitlines() if line)
+
+
+def read_commit_text(
+    repo: Path,
+    target_commit_sha: str,
+    relative_path: str,
+    *,
+    runner: ReadOnlyCommandRunner | None = None,
+) -> str | None:
+    transport = runner or ReadOnlyCommandRunner()
+    result = transport.run(
+        ["git", "show", f"{target_commit_sha}:{relative_path}"],
+        cwd=repo,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
 def collect_repository_profile_evidence(
     *,
     repository: str,
@@ -76,20 +118,17 @@ def collect_workflow_sources(
     repository: str,
     target_commit_sha: str,
 ) -> list[dict[str, Any]]:
-    workflow_dir = repo / ".github" / "workflows"
-    if not workflow_dir.is_dir():
-        return []
+    paths = [
+        path
+        for path in list_commit_paths(repo, target_commit_sha)
+        if path.startswith(".github/workflows/")
+        and path.rsplit(".", 1)[-1].lower() in {"yml", "yaml"}
+    ]
 
     evidence: list[dict[str, Any]] = []
-    paths = sorted(
-        [*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")],
-        key=lambda item: item.as_posix(),
-    )
-    for path in paths:
-        relative = path.relative_to(repo).as_posix()
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
+    for relative in paths:
+        text = read_commit_text(repo, target_commit_sha, relative)
+        if text is None:
             continue
         digest = hashlib.sha256(relative.encode("utf-8")).hexdigest()[:12]
         evidence.append(
@@ -108,3 +147,4 @@ def collect_workflow_sources(
             )
         )
     return evidence
+

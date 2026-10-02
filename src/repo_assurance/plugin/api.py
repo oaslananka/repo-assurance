@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, Sequence
 
 from repo_assurance.cli import _audit, _build_plan, _discover
 from repo_assurance.core.schema import validate_document
@@ -47,6 +47,7 @@ def audit_repository(
     offline: bool = False,
     history_days: int | None = None,
     max_runs: int | None = None,
+    baseline_evidence: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Run the canonical read-only audit and return plan/report metadata without raw evidence."""
     plan, report, evidence = _audit(
@@ -56,7 +57,8 @@ def audit_repository(
         history_days=history_days,
         max_runs=max_runs,
         offline=offline,
-        no_current_baseline=offline,
+        no_current_baseline=False,
+        baseline_evidence=baseline_evidence,
     )
     return {
         "plan": plan,

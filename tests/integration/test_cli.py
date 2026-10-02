@@ -246,3 +246,101 @@ def test_required_check_names_include_active_default_branch_rulesets() -> None:
         "classic-check",
         "ruleset-check",
     }
+
+def test_target_snapshot_source_evidence_ignores_checkout_and_dirty_worktree(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = init_repo(tmp_path)
+    target_sha = git(repo, "rev-parse", "HEAD")
+
+    (repo / "app.py").unlink()
+    (repo / "package.json").write_text(
+        json.dumps({"name": "later", "scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    workflow = repo / ".github" / "workflows" / "ci.yml"
+    workflow.write_text(
+        """name: LATER
+permissions: write-all
+jobs:
+  test:
+    runs-on: macos-14
+""",
+        encoding="utf-8",
+    )
+    git(repo, "add", ".")
+    git(repo, "commit", "-m", "later checkout")
+    workflow.write_text("name: DIRTY\n", encoding="utf-8")
+
+    assert main(["discover", "--repo", str(repo), "--target", target_sha]) == 0
+    discovered = json.loads(capsys.readouterr().out)
+    assert discovered["snapshot"]["target_commit_sha"] == target_sha
+    assert discovered["profile"]["languages"] == ["python"]
+    assert discovered["profile"]["package_managers"] == ["python"]
+
+    output = tmp_path / "audit-target"
+    assert main([
+        "audit", "--repo", str(repo), "--target", target_sha,
+        "--offline", "--debug-evidence", "--output", str(output),
+    ]) == 0
+    capsys.readouterr()
+    evidence = json.loads((output / "evidence.json").read_text(encoding="utf-8"))
+    workflow_evidence = next(
+        item for item in evidence if item.get("subject", {}).get("identifier") == ".github/workflows/ci.yml"
+    )
+    assert "name: CI" in workflow_evidence["observation"]["text"]
+    assert "LATER" not in workflow_evidence["observation"]["text"]
+    assert "DIRTY" not in workflow_evidence["observation"]["text"]
+    assert workflow_evidence["snapshot"]["target_commit_sha"] == target_sha
+
+
+def test_supplied_current_baseline_reaches_ci_static_evaluator(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = init_repo(tmp_path)
+    workflow = repo / ".github" / "workflows" / "ci.yml"
+    workflow.write_text(
+        """name: CI
+permissions: read-all
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - run: pytest
+""",
+        encoding="utf-8",
+    )
+    git(repo, "add", ".github/workflows/ci.yml")
+    git(repo, "commit", "-m", "use retiring runner")
+
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(json.dumps({
+        "schema_version": "baseline-evidence/v1",
+        "subject": "github-actions/macos-14",
+        "claim": "runner lifecycle",
+        "status": "retiring",
+        "effective_dates": {"retirement": "2026-11-02"},
+        "source": {
+            "authority": "official",
+            "publisher": "GitHub",
+            "url": "https://github.blog/changelog/example",
+        },
+        "checked_at": "2026-10-02T12:00:00Z",
+    }), encoding="utf-8")
+
+    output = tmp_path / "audit-baseline"
+    assert main([
+        "audit", "--repo", str(repo), "--offline",
+        "--baseline-evidence", str(baseline_path), "--output", str(output),
+    ]) == 0
+    capsys.readouterr()
+    report = json.loads((output / "audit-report.json").read_text(encoding="utf-8"))
+    ci_static_008 = next(
+        item for item in report["control_results"] if item["control_id"] == "CI-STATIC-008"
+    )
+    assert ci_static_008["state"] == "FINDING"
+    assert ci_static_008["reason"] == "runner_lifecycle_risk:macos-14=retiring"
+    assert any(item["type"] == "DEPRECATION_RISK" for item in report["findings"])
+
