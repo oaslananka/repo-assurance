@@ -90,3 +90,23 @@ See `references/` for the audit protocol and extension contracts.
 - `src/repo_assurance/core/` — planning, correlation, dedupe, findings, completeness, remediation.
 - `src/repo_assurance/renderers/` — canonical report presentation.
 - `tests/` — unit, integration, golden, safety, and skill-contract tests.
+
+## ChatGPT local plugin
+
+Repo Assurance can be packaged as an Agent Plugins 1.0 local plugin for ChatGPT Desktop and other hosts that support local stdio MCP servers.
+
+Install the local runtime dependencies from the repository root:
+
+```bash
+python -m pip install -e '.[plugin]'
+```
+
+Build the standalone plugin package:
+
+```bash
+python scripts/build_plugin.py
+```
+
+The package contains `plugin.json`, `mcp.json`, the repository-assurance skill, and the read-only Python MCP adapter. The MCP server exposes `discover_repository`, `plan_repository_audit`, `audit_repository`, and `render_audit_report`; it does not expose arbitrary shell execution or remediation/mutation tools.
+
+Local filesystem access requires a host that can launch the stdio MCP process (for example ChatGPT Desktop). Saving the package to a ChatGPT account does not by itself grant local filesystem access on web or mobile.
