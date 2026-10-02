@@ -26,9 +26,9 @@ def _access_state(item: dict[str, Any] | None) -> str:
 def _control_state_for_access(access: str) -> str:
     if access in {"UNKNOWN_PERMISSION", "AUTH_FAILED"}:
         return "UNKNOWN_PERMISSION"
-    if access == "UNKNOWN_ERROR":
+    if access in {"UNKNOWN_ERROR"}:
         return "UNKNOWN_ERROR"
-    if access == "UNAVAILABLE":
+    if access in {"UNAVAILABLE"}:
         return "UNAVAILABLE"
     return "INCONCLUSIVE"
 
@@ -127,12 +127,27 @@ def evaluate_governance(evidence: Sequence[dict[str, Any]]) -> list[dict[str, An
     if protected or active_rulesets:
         gov_001 = _result("GH-GOV-001", "PASS", subject, governance_evidence)
     elif rulesets_access != "AVAILABLE":
-        gov_001 = _result("GH-GOV-001", _control_state_for_access(rulesets_access), subject, governance_evidence, reason="ruleset_visibility_incomplete")
+        gov_001 = _result(
+            "GH-GOV-001",
+            _control_state_for_access(rulesets_access),
+            subject,
+            governance_evidence,
+            reason="ruleset_visibility_incomplete",
+        )
     elif branch_access != "AVAILABLE":
-        gov_001 = _result("GH-GOV-001", _control_state_for_access(branch_access), subject, governance_evidence, reason="default_branch_visibility_incomplete")
+        gov_001 = _result(
+            "GH-GOV-001",
+            _control_state_for_access(branch_access),
+            subject,
+            governance_evidence,
+            reason="default_branch_visibility_incomplete",
+        )
     else:
         gov_001 = _result(
-            "GH-GOV-001", "FINDING", subject, governance_evidence,
+            "GH-GOV-001",
+            "FINDING",
+            subject,
+            governance_evidence,
             reason="default_branch_governance_absent",
             candidates=["candidate_GH-GOV-001_default_branch_governance"],
         )
@@ -144,9 +159,21 @@ def evaluate_governance(evidence: Sequence[dict[str, Any]]) -> list[dict[str, An
 
     required_evidence = [item["id"] for item in (branch, rulesets_evidence, checks_evidence) if item]
     if rulesets_access != "AVAILABLE":
-        gov_003 = _result("GH-GOV-003", _control_state_for_access(rulesets_access), subject, required_evidence, reason="ruleset_visibility_incomplete")
+        gov_003 = _result(
+            "GH-GOV-003",
+            _control_state_for_access(rulesets_access),
+            subject,
+            required_evidence,
+            reason="ruleset_visibility_incomplete",
+        )
     elif required_checks and not checks_evidence:
-        gov_003 = _result("GH-GOV-003", "INCONCLUSIVE", subject, required_evidence, reason="produced_checks_not_observed")
+        gov_003 = _result(
+            "GH-GOV-003",
+            "INCONCLUSIVE",
+            subject,
+            required_evidence,
+            reason="produced_checks_not_observed",
+        )
     else:
         produced: set[str] = set()
         if checks_evidence:
@@ -156,16 +183,31 @@ def evaluate_governance(evidence: Sequence[dict[str, Any]]) -> list[dict[str, An
         stale = sorted(required_checks - produced) if checks_evidence else []
         if stale:
             gov_003 = _result(
-                "GH-GOV-003", "FINDING", subject, required_evidence,
+                "GH-GOV-003",
+                "FINDING",
+                subject,
+                required_evidence,
                 reason=f"stale_required_checks:{','.join(stale)}",
                 candidates=["candidate_GH-GOV-003_stale_required_checks"],
             )
         else:
-            gov_003 = _result("GH-GOV-003", "PASS", subject, required_evidence, reason="required_checks:none" if not required_checks else None)
+            gov_003 = _result(
+                "GH-GOV-003",
+                "PASS",
+                subject,
+                required_evidence,
+                reason="required_checks:none" if not required_checks else None,
+            )
 
     bypass_evidence = [rulesets_evidence["id"]] if rulesets_evidence else []
     if rulesets_access != "AVAILABLE":
-        gov_007 = _result("GH-GOV-007", _control_state_for_access(rulesets_access), subject, bypass_evidence, reason="ruleset_visibility_incomplete")
+        gov_007 = _result(
+            "GH-GOV-007",
+            _control_state_for_access(rulesets_access),
+            subject,
+            bypass_evidence,
+            reason="ruleset_visibility_incomplete",
+        )
     else:
         always_bypass = [
             actor
@@ -175,7 +217,10 @@ def evaluate_governance(evidence: Sequence[dict[str, Any]]) -> list[dict[str, An
         ]
         if always_bypass:
             gov_007 = _result(
-                "GH-GOV-007", "FINDING", subject, bypass_evidence,
+                "GH-GOV-007",
+                "FINDING",
+                subject,
+                bypass_evidence,
                 reason=f"always_bypass_actors:{len(always_bypass)}",
                 candidates=["candidate_GH-GOV-007_bypass_exposure"],
             )
@@ -184,12 +229,21 @@ def evaluate_governance(evidence: Sequence[dict[str, Any]]) -> list[dict[str, An
 
     repo_evidence = [repository["id"]] if repository else []
     if repository_access != "AVAILABLE":
-        gov_008 = _result("GH-GOV-008", _control_state_for_access(repository_access), subject, repo_evidence, reason="repository_settings_visibility_incomplete")
+        gov_008 = _result(
+            "GH-GOV-008",
+            _control_state_for_access(repository_access),
+            subject,
+            repo_evidence,
+            reason="repository_settings_visibility_incomplete",
+        )
     else:
         repository_observation = repository.get("observation", {}) if repository else {}
         enabled = bool(repository_observation.get("delete_branch_on_merge")) if isinstance(repository_observation, dict) else False
         gov_008 = _result(
-            "GH-GOV-008", "PASS", subject, repo_evidence,
+            "GH-GOV-008",
+            "PASS",
+            subject,
+            repo_evidence,
             reason=f"auto_delete_merged_branches:{'enabled' if enabled else 'disabled'}",
         )
 

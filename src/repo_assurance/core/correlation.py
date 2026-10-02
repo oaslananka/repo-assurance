@@ -22,6 +22,38 @@ class CorrelationRule:
 
 _RULES: tuple[CorrelationRule, ...] = (
     CorrelationRule(
+        "CORR-CHRONIC-FAILURE",
+        "CI-OPS-003",
+        "CHRONIC_FAILURE",
+        "MEDIUM",
+        "HIGH",
+        "chronic-workflow-failure",
+    ),
+    CorrelationRule(
+        "CORR-FLAKY-JOB",
+        "CI-OPS-005",
+        "FLAKY_JOB",
+        "MEDIUM",
+        "HIGH",
+        "rerun-recovery-flakiness",
+    ),
+    CorrelationRule(
+        "CORR-STALE-REQUIRED-CHECK",
+        "GH-GOV-003",
+        "STALE_REQUIRED_CHECK",
+        "MEDIUM",
+        "CONFIRMED",
+        "stale-required-check",
+    ),
+    CorrelationRule(
+        "CORR-RUNNER-DEPRECATION",
+        "CI-STATIC-008",
+        "DEPRECATION_RISK",
+        "MEDIUM",
+        "HIGH",
+        "runner-lifecycle-risk",
+    ),
+    CorrelationRule(
         "CORR-UNRELIABLE-GATE",
         "CI-OPS-006",
         "UNRELIABLE_GATE",

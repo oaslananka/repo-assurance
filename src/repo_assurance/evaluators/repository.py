@@ -181,3 +181,46 @@ def discover_repository_profile(repo: Path) -> dict[str, object]:
         "build_command_candidates": sorted(set(build_commands)),
         "test_command_candidates": sorted(set(test_commands)),
     }
+
+
+def evaluate_repository_profile(profile_evidence: dict[str, Any]) -> list[dict[str, Any]]:
+    from datetime import datetime, timezone
+
+    from repo_assurance.core.schema import validate_document
+
+    observation = profile_evidence.get("observation", {})
+    subject = profile_evidence.get("subject") or {"type": "repository", "identifier": "unknown"}
+    evidence_id = str(profile_evidence.get("id", "ev_repository_profile"))
+
+    def result(control_id: str, state: str, reason: str) -> dict[str, Any]:
+        item = {
+            "schema_version": "control-result/v1",
+            "control_id": control_id,
+            "state": state,
+            "subject": dict(subject),
+            "evidence_ids": [evidence_id],
+            "candidate_finding_ids": [],
+            "evaluated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "reason": reason,
+        }
+        validate_document("control-result.v1", item)
+        return item
+
+    repo_type = observation.get("repository_type") if isinstance(observation, dict) else None
+    classification_state = "PASS" if repo_type and repo_type != "unknown" else "INCONCLUSIVE"
+    classification_reason = f"repository_type:{repo_type or 'unknown'}"
+
+    languages = observation.get("languages", []) if isinstance(observation, dict) else []
+    ecosystem_state = "PASS" if isinstance(languages, list) else "INCONCLUSIVE"
+    ecosystem_reason = "ecosystem_inventory_collected" if ecosystem_state == "PASS" else "ecosystem_inventory_unavailable"
+
+    build_commands = observation.get("build_command_candidates") if isinstance(observation, dict) else None
+    test_commands = observation.get("test_command_candidates") if isinstance(observation, dict) else None
+    command_state = "PASS" if isinstance(build_commands, list) and isinstance(test_commands, list) else "INCONCLUSIVE"
+    command_reason = "command_discovery_completed" if command_state == "PASS" else "command_discovery_unavailable"
+
+    return [
+        result("REPO-001", classification_state, classification_reason),
+        result("REPO-002", ecosystem_state, ecosystem_reason),
+        result("REPO-003", command_state, command_reason),
+    ]

@@ -38,7 +38,9 @@ def workspace_observation(evidence: list[dict]) -> dict:
 
 def test_collect_repository_identity_parses_github_remote(tmp_path: Path) -> None:
     repo = init_repo(tmp_path)
+
     evidence = collect_repository_identity(repo)
+
     observation = evidence[0]["observation"]
     assert observation["owner"] == "acme"
     assert observation["name"] == "demo"
@@ -48,12 +50,17 @@ def test_collect_repository_identity_parses_github_remote(tmp_path: Path) -> Non
 
 def test_clean_repository_is_in_sync(tmp_path: Path) -> None:
     repo = init_repo(tmp_path)
+
     evidence = collect_snapshot(repo, "main")
+
     observation = snapshot_observation(evidence)
     assert observation["drift"] == "IN_SYNC"
     assert observation["target_commit_sha"] == git(repo, "rev-parse", "main")
     assert workspace_observation(evidence) == {
-        "dirty": False, "staged": 0, "unstaged": 0, "untracked": 0
+        "dirty": False,
+        "staged": 0,
+        "unstaged": 0,
+        "untracked": 0,
     }
 
 
@@ -62,7 +69,9 @@ def test_local_ahead_is_classified(tmp_path: Path) -> None:
     (repo / "README.md").write_text("two\n", encoding="utf-8")
     git(repo, "add", "README.md")
     git(repo, "commit", "-m", "local ahead")
+
     evidence = collect_snapshot(repo, "main")
+
     assert snapshot_observation(evidence)["drift"] == "LOCAL_AHEAD"
 
 
@@ -75,7 +84,9 @@ def test_local_behind_is_classified(tmp_path: Path) -> None:
     remote = git(repo, "rev-parse", "HEAD")
     git(repo, "reset", "--hard", first)
     git(repo, "update-ref", "refs/remotes/origin/main", remote)
+
     evidence = collect_snapshot(repo, "main")
+
     assert snapshot_observation(evidence)["drift"] == "LOCAL_BEHIND"
 
 
@@ -93,14 +104,18 @@ def test_diverged_is_classified(tmp_path: Path) -> None:
     git(repo, "add", "local.txt")
     git(repo, "commit", "-m", "local side")
     git(repo, "update-ref", "refs/remotes/origin/main", remote)
+
     evidence = collect_snapshot(repo, "main")
+
     assert snapshot_observation(evidence)["drift"] == "DIVERGED"
 
 
 def test_detached_head_is_classified(tmp_path: Path) -> None:
     repo = init_repo(tmp_path)
     git(repo, "checkout", "--detach", "HEAD")
+
     evidence = collect_snapshot(repo, "HEAD")
+
     assert snapshot_observation(evidence)["drift"] == "DETACHED"
 
 
@@ -110,9 +125,14 @@ def test_dirty_workspace_counts_staged_unstaged_and_untracked(tmp_path: Path) ->
     git(repo, "add", "README.md")
     (repo / "README.md").write_text("unstaged after staged\n", encoding="utf-8")
     (repo / "new.txt").write_text("new\n", encoding="utf-8")
+
     evidence = collect_snapshot(repo, "main")
+
     assert workspace_observation(evidence) == {
-        "dirty": True, "staged": 1, "unstaged": 1, "untracked": 1
+        "dirty": True,
+        "staged": 1,
+        "unstaged": 1,
+        "untracked": 1,
     }
 
 
@@ -122,7 +142,9 @@ def test_snapshot_collection_does_not_change_repository_state(tmp_path: Path) ->
     before_head = git(repo, "rev-parse", "HEAD")
     before_status = git(repo, "status", "--porcelain=v1")
     before_branch = git(repo, "branch", "--show-current")
+
     collect_snapshot(repo, "main")
+
     assert git(repo, "rev-parse", "HEAD") == before_head
     assert git(repo, "status", "--porcelain=v1") == before_status
     assert git(repo, "branch", "--show-current") == before_branch
@@ -131,7 +153,9 @@ def test_snapshot_collection_does_not_change_repository_state(tmp_path: Path) ->
 def test_snapshot_evaluator_accounts_for_all_snapshot_controls(tmp_path: Path) -> None:
     repo = init_repo(tmp_path)
     evidence = collect_repository_identity(repo) + collect_snapshot(repo, "main")
+
     results = evaluate_snapshot(evidence)
+
     assert {item["control_id"] for item in results} == {
         "SNAP-001", "SNAP-002", "SNAP-003", "SNAP-004"
     }

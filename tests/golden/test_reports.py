@@ -157,3 +157,26 @@ def test_priority_findings_are_sorted_by_priority() -> None:
     markdown = render_markdown(report)
 
     assert markdown.index("P1") < markdown.index("P4")
+
+
+def test_operational_and_governance_types_get_specific_titles() -> None:
+    cases = [
+        ("CHRONIC_FAILURE", "CI workflow is chronically failing"),
+        ("FLAKY_JOB", "CI workflow is flaky"),
+        ("STALE_REQUIRED_CHECK", "Required status check is stale"),
+        ("DEPRECATION_RISK", "Current platform lifecycle creates a deprecation risk"),
+    ]
+    groups = []
+    for index, (finding_type, _) in enumerate(cases):
+        item = group(
+            finding_type=finding_type,
+            identifier=f"subject-{index}",
+            fingerprint="sha256:" + format(index + 1, "064x"),
+        )
+        groups.append(item)
+
+    findings = materialize_findings(groups, baseline_as_of="2026-10-02")
+    by_type = {item["type"]: item for item in findings}
+
+    for finding_type, title in cases:
+        assert by_type[finding_type]["title"] == title

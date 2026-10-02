@@ -54,7 +54,9 @@ def recent_runs(conclusions: list[str], *, sha: str | None = None) -> list[dict]
 
 def test_chronic_failure_candidate_when_failure_rate_is_high() -> None:
     runs = recent_runs(["failure"] * 8 + ["success"] * 2)
+
     results = evaluate_ci_operational([history("10", runs)], now=NOW)
+
     item = by_control(results, "CI-OPS-003")
     assert item["state"] == "FINDING"
     assert item["reason"] == "chronic_failure:runs=10,failure_rate=0.800,consecutive_failures=8"
@@ -62,7 +64,13 @@ def test_chronic_failure_candidate_when_failure_rate_is_high() -> None:
 
 def test_required_chronic_failure_becomes_unreliable_gate() -> None:
     runs = recent_runs(["failure"] * 8 + ["success"] * 2)
-    results = evaluate_ci_operational([history("10", runs)], required_workflow_ids={"10"}, now=NOW)
+
+    results = evaluate_ci_operational(
+        [history("10", runs)],
+        required_workflow_ids={"10"},
+        now=NOW,
+    )
+
     item = by_control(results, "CI-OPS-006")
     assert item["state"] == "FINDING"
     assert item["reason"] == "required_gate_unreliable:10"
@@ -70,7 +78,9 @@ def test_required_chronic_failure_becomes_unreliable_gate() -> None:
 
 def test_optional_chronic_failure_does_not_claim_required_gate_risk() -> None:
     runs = recent_runs(["failure"] * 8 + ["success"] * 2)
+
     results = evaluate_ci_operational([history("10", runs)], required_workflow_ids=set(), now=NOW)
+
     item = by_control(results, "CI-OPS-006")
     assert item["state"] == "PASS"
     assert item["reason"] == "workflow_not_required"
@@ -82,7 +92,9 @@ def test_same_sha_failed_then_rerun_passed_is_flaky_signal() -> None:
         run(2, "success", "2026-10-02T10:05:00Z", sha=sha, attempt=2),
         run(1, "failure", "2026-10-02T10:00:00Z", sha=sha, attempt=1),
     ]
+
     results = evaluate_ci_operational([history("10", runs)], now=NOW)
+
     item = by_control(results, "CI-OPS-005")
     assert item["state"] == "FINDING"
     assert item["reason"] == f"rerun_recovery:{sha}"
@@ -90,12 +102,14 @@ def test_same_sha_failed_then_rerun_passed_is_flaky_signal() -> None:
 
 def test_healthy_expected_blocking_workflow_not_required_is_enforcement_gap() -> None:
     runs = recent_runs(["success"] * 10)
+
     results = evaluate_ci_operational(
         [history("10", runs)],
         required_workflow_ids=set(),
         expected_blocking_workflow_ids={"10"},
         now=NOW,
     )
+
     item = by_control(results, "CI-OPS-007")
     assert item["state"] == "FINDING"
     assert item["reason"] == "healthy_expected_gate_not_required:10"
@@ -103,7 +117,9 @@ def test_healthy_expected_blocking_workflow_not_required_is_enforcement_gap() ->
 
 def test_no_policy_context_does_not_invent_enforcement_gap() -> None:
     runs = recent_runs(["success"] * 10)
+
     results = evaluate_ci_operational([history("10", runs)], now=NOW)
+
     item = by_control(results, "CI-OPS-007")
     assert item["state"] == "INCONCLUSIVE"
     assert item["reason"] == "blocking_expectation_unknown"
@@ -111,6 +127,7 @@ def test_no_policy_context_does_not_invent_enforcement_gap() -> None:
 
 def test_expected_workflow_with_no_runs_is_dead_workflow_finding() -> None:
     results = evaluate_ci_operational([history("10", [], expected_execution=True)], now=NOW)
+
     item = by_control(results, "CI-OPS-008")
     assert item["state"] == "FINDING"
     assert item["reason"] == "expected_workflow_has_no_observed_runs"
@@ -118,6 +135,7 @@ def test_expected_workflow_with_no_runs_is_dead_workflow_finding() -> None:
 
 def test_no_runs_without_execution_expectation_is_inconclusive_not_dead() -> None:
     results = evaluate_ci_operational([history("10", [], expected_execution=False)], now=NOW)
+
     item = by_control(results, "CI-OPS-008")
     assert item["state"] == "INCONCLUSIVE"
     assert item["reason"] == "workflow_execution_expectation_absent"
@@ -125,7 +143,13 @@ def test_no_runs_without_execution_expectation_is_inconclusive_not_dead() -> Non
 
 def test_stale_last_execution_is_finding_only_when_expected_to_run() -> None:
     runs = [run(1, "success", "2026-07-01T10:00:00Z")]
-    results = evaluate_ci_operational([history("10", runs, expected_execution=True)], now=NOW, stale_after_days=30)
+
+    results = evaluate_ci_operational(
+        [history("10", runs, expected_execution=True)],
+        now=NOW,
+        stale_after_days=30,
+    )
+
     item = by_control(results, "CI-OPS-001")
     assert item["state"] == "FINDING"
     assert item["reason"].startswith("workflow_execution_stale:last_run=2026-07-01")
@@ -136,5 +160,7 @@ def test_permission_limited_history_propagates_unknown_permission() -> None:
     item["observation"] = {"access_state": "UNKNOWN_PERMISSION", "error_code": "HTTP_403", "runs": []}
     item["visibility"]["completeness"] = "unknown"
     item["visibility"]["permission_limited"] = True
+
     results = evaluate_ci_operational([item], now=NOW)
+
     assert {result["state"] for result in results} == {"UNKNOWN_PERMISSION"}

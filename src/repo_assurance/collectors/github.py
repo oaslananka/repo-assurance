@@ -36,6 +36,8 @@ def _http_code(text: str) -> str | None:
 def classify_gh_error(result) -> GitHubAccessState:
     if result.returncode == 0:
         return GitHubAccessState.AVAILABLE
+    if result.returncode == 127:
+        return GitHubAccessState.UNAVAILABLE
     combined = f"{result.stdout}\n{result.stderr}"
     code = _http_code(combined)
     if code == "401" or "bad credentials" in combined.lower() or "authentication failed" in combined.lower():
@@ -133,13 +135,15 @@ def collect_repository_state(
     if error is not None:
         return [error]
     if not isinstance(payload, dict):
-        return [_make_evidence(
-            evidence_id="ev_github_repository",
-            repository=repository,
-            target_commit_sha=target_commit_sha,
-            observation={"access_state": "UNKNOWN_ERROR", "error_code": "UNEXPECTED_JSON_SHAPE"},
-            access_state=GitHubAccessState.UNKNOWN_ERROR,
-        )]
+        return [
+            _make_evidence(
+                evidence_id="ev_github_repository",
+                repository=repository,
+                target_commit_sha=target_commit_sha,
+                observation={"access_state": "UNKNOWN_ERROR", "error_code": "UNEXPECTED_JSON_SHAPE"},
+                access_state=GitHubAccessState.UNKNOWN_ERROR,
+            )
+        ]
     observation = {
         "access_state": GitHubAccessState.AVAILABLE.value,
         "full_name": payload.get("full_name"),
@@ -152,13 +156,15 @@ def collect_repository_state(
         "allow_rebase_merge": payload.get("allow_rebase_merge"),
         "allow_squash_merge": payload.get("allow_squash_merge"),
     }
-    return [_make_evidence(
-        evidence_id="ev_github_repository",
-        repository=repository,
-        target_commit_sha=target_commit_sha,
-        observation=observation,
-        access_state=GitHubAccessState.AVAILABLE,
-    )]
+    return [
+        _make_evidence(
+            evidence_id="ev_github_repository",
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            observation=observation,
+            access_state=GitHubAccessState.AVAILABLE,
+        )
+    ]
 
 
 def collect_rulesets(
@@ -178,13 +184,15 @@ def collect_rulesets(
     if error is not None:
         return [error]
     if not isinstance(payload, list):
-        return [_make_evidence(
-            evidence_id="ev_github_rulesets",
-            repository=repository,
-            target_commit_sha=target_commit_sha,
-            observation={"access_state": "UNKNOWN_ERROR", "error_code": "UNEXPECTED_JSON_SHAPE"},
-            access_state=GitHubAccessState.UNKNOWN_ERROR,
-        )]
+        return [
+            _make_evidence(
+                evidence_id="ev_github_rulesets",
+                repository=repository,
+                target_commit_sha=target_commit_sha,
+                observation={"access_state": "UNKNOWN_ERROR", "error_code": "UNEXPECTED_JSON_SHAPE"},
+                access_state=GitHubAccessState.UNKNOWN_ERROR,
+            )
+        ]
     rulesets = [
         {
             "id": item.get("id"),
@@ -200,13 +208,15 @@ def collect_rulesets(
         for item in payload
         if isinstance(item, dict)
     ]
-    return [_make_evidence(
-        evidence_id="ev_github_rulesets",
-        repository=repository,
-        target_commit_sha=target_commit_sha,
-        observation={"access_state": GitHubAccessState.AVAILABLE.value, "rulesets": rulesets},
-        access_state=GitHubAccessState.AVAILABLE,
-    )]
+    return [
+        _make_evidence(
+            evidence_id="ev_github_rulesets",
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            observation={"access_state": GitHubAccessState.AVAILABLE.value, "rulesets": rulesets},
+            access_state=GitHubAccessState.AVAILABLE,
+        )
+    ]
 
 
 def collect_default_branch_state(
@@ -259,5 +269,44 @@ def collect_default_branch_state(
             "protected": bool(payload.get("protected")),
             "required_status_checks": sorted(required_checks),
         },
+        access_state=GitHubAccessState.AVAILABLE,
+    )]
+
+
+def collect_commit_checks(
+    repository: str,
+    target_commit_sha: str,
+    *,
+    runner: Runner | None = None,
+) -> list[dict[str, Any]]:
+    transport = runner or ReadOnlyCommandRunner()
+    payload, error = _collect_json(
+        argv=["gh", "api", f"/repos/{repository}/commits/{target_commit_sha}/check-runs?per_page=100"],
+        evidence_id="ev_github_checks",
+        repository=repository,
+        target_commit_sha=target_commit_sha,
+        runner=transport,
+    )
+    if error is not None:
+        return [error]
+    if not isinstance(payload, dict) or not isinstance(payload.get("check_runs"), list):
+        return [_make_evidence(
+            evidence_id="ev_github_checks",
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            observation={"access_state": "UNKNOWN_ERROR", "error_code": "UNEXPECTED_JSON_SHAPE"},
+            access_state=GitHubAccessState.UNKNOWN_ERROR,
+        )]
+
+    names = sorted({
+        str(item.get("name"))
+        for item in payload["check_runs"]
+        if isinstance(item, dict) and item.get("name")
+    })
+    return [_make_evidence(
+        evidence_id="ev_github_checks",
+        repository=repository,
+        target_commit_sha=target_commit_sha,
+        observation={"access_state": GitHubAccessState.AVAILABLE.value, "check_names": names},
         access_state=GitHubAccessState.AVAILABLE,
     )]

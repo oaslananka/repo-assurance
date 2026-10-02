@@ -1,1 +1,0 @@
-"""Read-only evidence collectors."""

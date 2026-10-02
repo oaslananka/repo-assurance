@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from repo_assurance.cli import build_parser, main
+from repo_assurance.core.schema import validate_document
+
+
+def git(repo: Path, *args: str) -> str:
+    result = subprocess.run(["git", *args], cwd=repo, text=True, capture_output=True, check=True)
+    return result.stdout.strip()
+
+
+def init_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "demo"
+    repo.mkdir()
+    git(repo, "init", "-b", "main")
+    git(repo, "config", "user.email", "fixture@example.com")
+    git(repo, "config", "user.name", "Fixture")
+    (repo / "pyproject.toml").write_text(
+        "[build-system]\nrequires=['setuptools']\n\n[tool.pytest.ini_options]\ntestpaths=['tests']\n",
+        encoding="utf-8",
+    )
+    workflow_dir = repo / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / "ci.yml").write_text(
+        """name: CI
+permissions: read-all
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pytest
+""",
+        encoding="utf-8",
+    )
+    (repo / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    git(repo, "add", ".")
+    git(repo, "commit", "-m", "initial")
+    git(repo, "remote", "add", "origin", "https://github.com/acme/demo.git")
+    git(repo, "update-ref", "refs/remotes/origin/main", git(repo, "rev-parse", "HEAD"))
+    return repo
+
+
+def test_discover_outputs_repository_profile_without_writing_repo(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    repo = init_repo(tmp_path)
+    before = git(repo, "status", "--porcelain=v1")
+
+    assert main(["discover", "--repo", str(repo)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["repository"]["full_name"] == "acme/demo"
+    assert payload["profile"]["github_actions"] is True
+    assert payload["profile"]["languages"] == ["python"]
+    assert git(repo, "status", "--porcelain=v1") == before
+
+
+def test_plan_outputs_schema_valid_plan_and_accounts_for_catalog(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    repo = init_repo(tmp_path)
+
+    assert main(["plan", "--repo", str(repo), "--mode", "standard"]) == 0
+
+    plan = json.loads(capsys.readouterr().out)
+    validate_document("audit-plan.v1", plan)
+    assert plan["repository"]["full_name"] == "acme/demo"
+    assert len(plan["controls"]) == 29
+    assert any(item["control_id"] == "CI-OPS-003" for item in plan["controls"])
+
+
+def test_audit_offline_writes_outputs_outside_repo_and_keeps_repo_clean(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    repo = init_repo(tmp_path)
+    before = git(repo, "status", "--porcelain=v1")
+
+    assert main(["audit", "--repo", str(repo), "--mode", "standard", "--offline"]) == 0
+
+    summary = json.loads(capsys.readouterr().out)
+    output_dir = Path(summary["output_dir"])
+    assert output_dir.is_dir()
+    assert repo not in output_dir.parents and output_dir != repo
+    plan_path = Path(summary["plan"])
+    report_path = Path(summary["report_json"])
+    markdown_path = Path(summary["report_markdown"])
+    assert plan_path.is_file()
+    assert report_path.is_file()
+    assert markdown_path.is_file()
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    validate_document("audit-report.v1", report)
+    assert report["repository"]["full_name"] == "acme/demo"
+    assert report["snapshot"]["target_commit_sha"] == git(repo, "rev-parse", "HEAD")
+    assert report["coverage"]["snapshot"] == "VERIFIED"
+    assert report["coverage"]["github_governance"] in {"UNAVAILABLE", "PARTIAL"}
+    assert git(repo, "status", "--porcelain=v1") == before
+
+
+def test_validate_and_render_commands_use_canonical_report(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    repo = init_repo(tmp_path)
+    output = tmp_path / "out"
+    assert main(["audit", "--repo", str(repo), "--mode", "quick", "--offline", "--output", str(output)]) == 0
+    capsys.readouterr()
+
+    report_path = output / "audit-report.json"
+    assert main(["validate", "report", str(report_path)]) == 0
+    assert "valid" in capsys.readouterr().out.lower()
+
+    assert main(["render", str(report_path), "--format", "markdown"]) == 0
+    markdown = capsys.readouterr().out
+    assert "# Repository Assurance Audit" in markdown
+
+
+def test_cli_exposes_no_mutation_flags() -> None:
+    parser = build_parser()
+    help_text = parser.format_help()
+    assert "--fix" not in help_text
+    assert "--apply" not in help_text
+    assert "--delete" not in help_text
+    assert "--remediate" not in help_text
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["audit", "--repo", ".", "--fix"])
+
+
+def test_pyproject_exposes_repo_assurance_console_script() -> None:
+    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    text = pyproject.read_text(encoding="utf-8")
+    assert '[project.scripts]' in text
+    assert 'repo-assurance = "repo_assurance.cli:main"' in text
+
+
+def test_validate_control_accepts_control_catalog_file(capsys: pytest.CaptureFixture[str]) -> None:
+    catalog_path = Path(__file__).resolve().parents[2] / "controls" / "snapshot.v1.json"
+
+    assert main(["validate", "control", str(catalog_path)]) == 0
+
+    output = capsys.readouterr().out.lower()
+    assert "valid" in output
+    assert "control" in output

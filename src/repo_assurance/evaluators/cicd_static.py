@@ -186,6 +186,7 @@ def evaluate_ci_static(
     evidence_ids = [str(item.get("id")) for item in items if item.get("id")]
     analyses = _analyses(items)
 
+    # CI-STATIC-001: delegate syntax/semantic validity to specialist evidence.
     actionlint_states = []
     for item in items:
         observation = item.get("observation")

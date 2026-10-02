@@ -6,6 +6,16 @@ from typing import Any, Mapping, Sequence
 from repo_assurance.core.schema import validate_document
 
 
+_CONTROL_IDS = (
+    "HYGIENE-001",
+    "HYGIENE-003",
+    "HYGIENE-004",
+    "HYGIENE-005",
+    "HYGIENE-008",
+    "HYGIENE-010",
+)
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -85,6 +95,7 @@ def evaluate_hygiene(
     results: list[dict[str, Any]] = []
     preservation_labels: list[str] = []
 
+    # HYGIENE-001 — cleanup candidates require strong integration evidence and no preservation signal.
     cleanup_findings = 0
     for branch in branches:
         observation = branch.get("observation")
@@ -107,6 +118,7 @@ def evaluate_hygiene(
     if not cleanup_findings:
         results.append(_result("HYGIENE-001", "PASS", repo_subject, []))
 
+    # HYGIENE-003 — local branch without upstream is only material when work exists only locally.
     local_only_findings = 0
     for branch in branches:
         observation = branch.get("observation")
@@ -128,6 +140,7 @@ def evaluate_hygiene(
     if not local_only_findings:
         results.append(_result("HYGIENE-003", "PASS", repo_subject, []))
 
+    # HYGIENE-004 — a configured upstream that is gone plus local unique commits is preservation-first.
     gone_findings = 0
     for branch in branches:
         observation = branch.get("observation")
@@ -147,6 +160,7 @@ def evaluate_hygiene(
     if not gone_findings:
         results.append(_result("HYGIENE-004", "PASS", repo_subject, []))
 
+    # HYGIENE-005 — any dirty secondary worktree is preservation-first, regardless of branch age.
     dirty_findings = 0
     for worktree in worktrees:
         observation = worktree.get("observation")
@@ -165,6 +179,7 @@ def evaluate_hygiene(
     if not dirty_findings:
         results.append(_result("HYGIENE-005", "PASS", repo_subject, []))
 
+    # HYGIENE-008 — detached HEAD commits not reachable from the target must be preserved.
     if detached and isinstance(detached.get("observation"), Mapping):
         observation = detached["observation"]
         ahead = int(observation.get("ahead_of_target") or 0)

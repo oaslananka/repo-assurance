@@ -128,3 +128,35 @@ def test_unmapped_finding_control_is_not_invented() -> None:
         control_results=[result("GH-GOV-001")],
         evidence=[evidence()],
     ) == []
+
+
+def test_chronic_optional_workflow_becomes_canonical_candidate() -> None:
+    candidates = correlate(
+        control_results=[result("CI-OPS-003", reason="chronic_failure:runs=10,failure_rate=0.800,consecutive_failures=3")],
+        evidence=[evidence()],
+    )
+    assert candidates[0]["type"] == "CHRONIC_FAILURE"
+
+
+def test_flaky_workflow_becomes_canonical_candidate() -> None:
+    candidates = correlate(
+        control_results=[result("CI-OPS-005", reason="rerun_recovery:" + "a" * 40)],
+        evidence=[evidence()],
+    )
+    assert candidates[0]["type"] == "FLAKY_JOB"
+
+
+def test_stale_required_check_becomes_canonical_candidate() -> None:
+    candidates = correlate(
+        control_results=[result("GH-GOV-003", reason="stale_required_checks:old-check")],
+        evidence=[evidence()],
+    )
+    assert candidates[0]["type"] == "STALE_REQUIRED_CHECK"
+
+
+def test_runner_deprecation_becomes_canonical_candidate() -> None:
+    candidates = correlate(
+        control_results=[result("CI-STATIC-008", reason="runner_lifecycle_risk:macos-14=retiring")],
+        evidence=[evidence()],
+    )
+    assert candidates[0]["type"] == "DEPRECATION_RISK"

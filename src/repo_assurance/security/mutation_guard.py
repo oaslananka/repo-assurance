@@ -26,13 +26,16 @@ class ReadOnlyCommandRunner:
     ) -> subprocess.CompletedProcess[str]:
         command = list(argv)
         self._assert_read_only(command)
-        return self._executor(
-            command,
-            cwd=cwd,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            return self._executor(
+                command,
+                cwd=cwd,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            return subprocess.CompletedProcess(command, 127, "", str(exc))
 
     def _assert_read_only(self, argv: list[str]) -> None:
         if not argv:
@@ -61,6 +64,7 @@ class ReadOnlyCommandRunner:
             "for-each-ref",
             "ls-files",
             "cat-file",
+            "rev-list",
         }
         if subcommand in always_read_only:
             return

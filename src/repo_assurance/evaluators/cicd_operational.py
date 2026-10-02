@@ -178,6 +178,7 @@ def _evaluate_one(
     expected_execution = _expected_execution(item)
     stats = _outcome_stats(runs)
 
+    # CI-OPS-001: freshness is bounded to the observed history.
     last_run = _last_run_time(runs)
     if not runs:
         freshness = _result(

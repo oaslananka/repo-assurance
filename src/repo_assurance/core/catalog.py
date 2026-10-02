@@ -26,6 +26,35 @@ def _control_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "controls"
 
 
+
+def validate_catalog_document(payload: object, *, source_name: str = "<memory>") -> list[dict[str, object]]:
+    """Validate one control-catalog/v1 document and return its controls."""
+    if not isinstance(payload, dict):
+        raise CatalogError(f"invalid catalog file {source_name}: expected object")
+    if payload.get("schema_version") != "control-catalog/v1":
+        raise CatalogError(f"invalid catalog file {source_name}: unsupported schema_version")
+    if not isinstance(payload.get("domain"), str) or not payload["domain"]:
+        raise CatalogError(f"invalid catalog file {source_name}: missing domain")
+    file_controls = payload.get("controls")
+    if not isinstance(file_controls, list):
+        raise CatalogError(f"invalid catalog file {source_name}: controls must be a list")
+
+    controls: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for control in file_controls:
+        if not isinstance(control, dict):
+            raise CatalogError(f"invalid control in {source_name}: expected object")
+        try:
+            validate_document("control.v1", control)
+        except SchemaValidationError as exc:
+            raise CatalogError(f"invalid control in {source_name}: {exc}") from exc
+        control_id = str(control["id"])
+        if control_id in seen:
+            raise CatalogError(f"duplicate control id in {source_name}: {control_id}")
+        seen.add(control_id)
+        controls.append(control)
+    return controls
+
 def load_catalog(control_dir: Path | None = None) -> list[dict[str, object]]:
     directory = Path(control_dir) if control_dir is not None else _control_dir()
     controls: list[dict[str, object]] = []
@@ -40,23 +69,7 @@ def load_catalog(control_dir: Path | None = None) -> list[dict[str, object]]:
         except (OSError, json.JSONDecodeError) as exc:
             raise CatalogError(f"invalid catalog file {path.name}: {exc}") from exc
 
-        if not isinstance(payload, dict):
-            raise CatalogError(f"invalid catalog file {path.name}: expected object")
-        if payload.get("schema_version") != "control-catalog/v1":
-            raise CatalogError(f"invalid catalog file {path.name}: unsupported schema_version")
-        if not isinstance(payload.get("domain"), str) or not payload["domain"]:
-            raise CatalogError(f"invalid catalog file {path.name}: missing domain")
-        file_controls = payload.get("controls")
-        if not isinstance(file_controls, list):
-            raise CatalogError(f"invalid catalog file {path.name}: controls must be a list")
-
-        for control in file_controls:
-            if not isinstance(control, dict):
-                raise CatalogError(f"invalid control in {path.name}: expected object")
-            try:
-                validate_document("control.v1", control)
-            except SchemaValidationError as exc:
-                raise CatalogError(f"invalid control in {path.name}: {exc}") from exc
+        for control in validate_catalog_document(payload, source_name=path.name):
             control_id = str(control["id"])
             if control_id in seen:
                 raise CatalogError(f"duplicate control id: {control_id}")

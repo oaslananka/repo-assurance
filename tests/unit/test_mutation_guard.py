@@ -99,3 +99,14 @@ def test_git_rev_list_is_allowed_for_read_only_reachability_analysis() -> None:
 
     assert result.returncode == 0
     assert calls == [["git", "rev-list", "--count", "main..feature"]]
+
+
+def test_missing_allowlisted_executable_returns_127_instead_of_crashing() -> None:
+    def missing_executor(command, **kwargs):
+        raise FileNotFoundError("gh not installed")
+
+    runner = ReadOnlyCommandRunner(executor=missing_executor)
+    result = runner.run(["gh", "api", "/repos/acme/demo"])
+
+    assert result.returncode == 127
+    assert "gh not installed" in result.stderr

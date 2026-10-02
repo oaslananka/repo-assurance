@@ -101,4 +101,5 @@ def assert_no_secret_values(document: object) -> None:
                     raise SensitiveDataError("secret-like value remains in canonical document")
 
     inspect(document)
+    # Force serializability here too: canonical artifacts must be JSON-safe.
     json.dumps(document)
