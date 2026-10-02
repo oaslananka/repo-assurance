@@ -204,3 +204,210 @@ def collect_snapshot(repo: Path, target_ref: str | None) -> list[dict[str, Any]]
             target_sha=target_sha,
         ),
     ]
+
+
+def _int_output(
+    runner: ReadOnlyCommandRunner,
+    repo: Path,
+    *args: str,
+) -> int:
+    value = _run(runner, repo, *args)
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise GitCollectionError(f"git {' '.join(args)} did not return an integer") from exc
+
+
+def _reachability_state(
+    runner: ReadOnlyCommandRunner,
+    repo: Path,
+    *,
+    target_ref: str,
+    branch_ref: str,
+) -> tuple[str, int, int]:
+    ahead = _int_output(runner, repo, "rev-list", "--count", f"{target_ref}..{branch_ref}")
+    behind = _int_output(runner, repo, "rev-list", "--count", f"{branch_ref}..{target_ref}")
+    if ahead == 0:
+        return "FULLY_INTEGRATED", ahead, behind
+    if ahead > 0 and behind > 0:
+        return "DIVERGED", ahead, behind
+    return "HAS_UNIQUE_WORK", ahead, behind
+
+
+def collect_branches(repo: Path, target_ref: str) -> list[dict[str, Any]]:
+    """Collect local branch reachability and detached-head preservation signals."""
+    runner = ReadOnlyCommandRunner()
+    repository = str(_run(runner, repo, "rev-parse", "--show-toplevel"))
+    target_sha = str(_run(runner, repo, "rev-parse", target_ref))
+    format_string = "%00".join(
+        (
+            "%(refname:short)",
+            "%(objectname)",
+            "%(upstream:short)",
+            "%(upstream:track)",
+            "%(committerdate:iso8601-strict)",
+        )
+    )
+    listing = str(
+        _run(
+            runner,
+            repo,
+            "for-each-ref",
+            f"--format={format_string}",
+            "refs/heads",
+        )
+        or ""
+    )
+    evidence: list[dict[str, Any]] = []
+
+    for index, line in enumerate(listing.splitlines()):
+        if not line:
+            continue
+        parts = line.split("\x00")
+        if len(parts) != 5:
+            continue
+        name, sha, upstream, upstream_track, last_commit_at = parts
+        integration_state, ahead, behind = _reachability_state(
+            runner,
+            repo,
+            target_ref=target_ref,
+            branch_ref=name,
+        )
+        evidence.append(
+            _evidence(
+                evidence_id=f"ev_git_branch_{index}",
+                subject={"type": "local_branch", "identifier": name},
+                observation={
+                    "name": name,
+                    "sha": sha,
+                    "upstream": upstream or None,
+                    "upstream_gone": "gone" in upstream_track.lower(),
+                    "last_commit_at": last_commit_at or None,
+                    "ahead_of_target": ahead,
+                    "behind_target": behind,
+                    "integration_state": integration_state,
+                    "target_ref": target_ref,
+                },
+                repository=repository,
+                target_sha=target_sha,
+            )
+        )
+
+    current_branch = str(_run(runner, repo, "branch", "--show-current") or "")
+    if not current_branch:
+        head = str(_run(runner, repo, "rev-parse", "HEAD"))
+        integration_state, ahead, behind = _reachability_state(
+            runner,
+            repo,
+            target_ref=target_ref,
+            branch_ref="HEAD",
+        )
+        evidence.append(
+            _evidence(
+                evidence_id="ev_git_detached_head",
+                subject={"type": "commit", "identifier": head},
+                observation={
+                    "detached": True,
+                    "sha": head,
+                    "ahead_of_target": ahead,
+                    "behind_target": behind,
+                    "integration_state": integration_state,
+                    "target_ref": target_ref,
+                },
+                repository=repository,
+                target_sha=target_sha,
+            )
+        )
+    return evidence
+
+
+def _parse_worktree_blocks(raw: str) -> list[dict[str, str | bool]]:
+    blocks: list[dict[str, str | bool]] = []
+    current: dict[str, str | bool] = {}
+    for line in raw.splitlines() + [""]:
+        if not line:
+            if current:
+                blocks.append(current)
+                current = {}
+            continue
+        key, _, value = line.partition(" ")
+        if key in {"detached", "bare"}:
+            current[key] = True
+        else:
+            current[key] = value
+    return blocks
+
+
+def collect_worktrees(repo: Path, target_ref: str) -> list[dict[str, Any]]:
+    runner = ReadOnlyCommandRunner()
+    repository = str(_run(runner, repo, "rev-parse", "--show-toplevel"))
+    target_sha = str(_run(runner, repo, "rev-parse", target_ref))
+    raw = str(_run(runner, repo, "worktree", "list", "--porcelain") or "")
+    evidence: list[dict[str, Any]] = []
+
+    for index, block in enumerate(_parse_worktree_blocks(raw)):
+        path_text = str(block.get("worktree", ""))
+        if not path_text:
+            continue
+        worktree_path = Path(path_text)
+        status = str(_run(runner, worktree_path, "status", "--porcelain=v1") or "")
+        workspace = _workspace_counts(status)
+        branch_ref = block.get("branch")
+        branch = None
+        if isinstance(branch_ref, str) and branch_ref.startswith("refs/heads/"):
+            branch = branch_ref.removeprefix("refs/heads/")
+        evidence.append(
+            _evidence(
+                evidence_id=f"ev_git_worktree_{index}",
+                subject={"type": "worktree", "identifier": path_text},
+                observation={
+                    "path": path_text,
+                    "head_sha": block.get("HEAD"),
+                    "branch": branch,
+                    "detached": bool(block.get("detached")),
+                    "locked": block.get("locked") if "locked" in block else None,
+                    "prunable": block.get("prunable") if "prunable" in block else None,
+                    **workspace,
+                },
+                repository=repository,
+                target_sha=target_sha,
+            )
+        )
+    return evidence
+
+
+def collect_stashes(repo: Path, target_ref: str) -> list[dict[str, Any]]:
+    runner = ReadOnlyCommandRunner()
+    repository = str(_run(runner, repo, "rev-parse", "--show-toplevel"))
+    target_sha = str(_run(runner, repo, "rev-parse", target_ref))
+    raw = str(
+        _run(
+            runner,
+            repo,
+            "stash",
+            "list",
+            "--format=%gd%x00%H%x00%ci%x00%gs",
+        )
+        or ""
+    )
+    evidence: list[dict[str, Any]] = []
+    for index, line in enumerate(raw.splitlines()):
+        parts = line.split("\x00")
+        if len(parts) != 4:
+            continue
+        name, sha, created_at, message = parts
+        evidence.append(
+            _evidence(
+                evidence_id=f"ev_git_stash_{index}",
+                subject={"type": "stash", "identifier": name},
+                observation={
+                    "name": name,
+                    "sha": sha,
+                    "created_at": created_at,
+                    "message": message,
+                },
+                repository=repository,
+                target_sha=target_sha,
+            )
+        )
+    return evidence
