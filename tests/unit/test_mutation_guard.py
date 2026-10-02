@@ -85,3 +85,17 @@ def test_blocked_command_is_never_executed() -> None:
         runner.run(["git", "push"])
 
     assert called is False
+
+
+def test_git_rev_list_is_allowed_for_read_only_reachability_analysis() -> None:
+    calls: list[list[str]] = []
+
+    def fake_executor(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "1\n", "")
+
+    runner = ReadOnlyCommandRunner(executor=fake_executor)
+    result = runner.run(["git", "rev-list", "--count", "main..feature"])
+
+    assert result.returncode == 0
+    assert calls == [["git", "rev-list", "--count", "main..feature"]]
