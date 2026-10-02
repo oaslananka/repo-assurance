@@ -62,3 +62,41 @@ def normalize_failure_fingerprint(
         if any(pattern.search(haystack) for pattern in patterns):
             return fingerprint
     return "unknown"
+
+
+def _canonical_json_value(value):
+    if isinstance(value, dict):
+        return {str(key): _canonical_json_value(value[key]) for key in sorted(value, key=str)}
+    if isinstance(value, list):
+        return [_canonical_json_value(item) for item in value]
+    return value
+
+
+def _normalize_subject(subject: dict) -> dict:
+    normalized = dict(subject)
+    subject_type = str(normalized.get("type", "unknown")).strip().lower()
+    identifier = str(normalized.get("identifier", "unknown")).strip().replace("\\", "/")
+    result = {"type": subject_type, "identifier": identifier}
+    if "qualifiers" in normalized:
+        result["qualifiers"] = _canonical_json_value(normalized["qualifiers"])
+    return result
+
+
+def build_finding_fingerprint(
+    *,
+    control_family: str,
+    subject: dict,
+    root_discriminator: str,
+) -> str:
+    """Build a stable semantic finding fingerprint independent of evidence order."""
+    import hashlib
+    import json
+
+    payload = {
+        "schema_generation": "finding/v1",
+        "control_family": control_family.strip().upper(),
+        "subject": _normalize_subject(subject),
+        "root_discriminator": root_discriminator.strip(),
+    }
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return "sha256:" + hashlib.sha256(serialized.encode("utf-8")).hexdigest()
