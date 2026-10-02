@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "audit_id",
+    "mode",
+    "repository",
+    "snapshot",
+    "capabilities",
+    "controls",
+    "budgets"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "audit-plan/v1"
+    },
+    "audit_id": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "quick",
+        "standard",
+        "deep"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "required": [
+        "owner",
+        "name",
+        "full_name"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "full_name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "snapshot": {
+      "type": "object",
+      "required": [
+        "target_branch",
+        "target_commit_sha"
+      ],
+      "properties": {
+        "target_branch": {
+          "type": "string"
+        },
+        "target_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{40,64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "control_id",
+          "applicable"
+        ],
+        "properties": {
+          "control_id": {
+            "type": "string"
+          },
+          "applicable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "github",
+        "current_baseline"
+      ],
+      "properties": {
+        "github": {
+          "type": "object",
+          "required": [
+            "max_runs_per_workflow",
+            "max_history_days"
+          ],
+          "properties": {
+            "max_runs_per_workflow": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_history_days": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "current_baseline": {
+          "type": "object",
+          "required": [
+            "max_external_lookups"
+          ],
+          "properties": {
+            "max_external_lookups": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

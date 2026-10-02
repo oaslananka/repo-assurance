@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "subject",
+    "claim",
+    "status",
+    "source",
+    "checked_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "baseline-evidence/v1"
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effective_dates": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "authority",
+        "publisher"
+      ],
+      "properties": {
+        "authority": {
+          "enum": [
+            "official",
+            "upstream",
+            "secondary"
+          ]
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "checked_at": {
+      "type": "string"
+    },
+    "published_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

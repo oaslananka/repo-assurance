@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "candidate_id",
+    "control_id",
+    "subject",
+    "type",
+    "evidence_ids",
+    "proposed_severity",
+    "proposed_confidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "candidate-finding/v1"
+    },
+    "candidate_id": {
+      "type": "string"
+    },
+    "control_id": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "type",
+        "identifier"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "repository",
+            "branch",
+            "local_branch",
+            "worktree",
+            "stash",
+            "commit",
+            "file",
+            "workflow",
+            "github_workflow",
+            "github_job",
+            "github_check",
+            "ruleset",
+            "pull_request",
+            "issue",
+            "dependency",
+            "provider",
+            "provider_check",
+            "runtime"
+          ]
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "qualifiers": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "type": {
+      "type": "string"
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "proposed_severity": {
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "INFO"
+      ]
+    },
+    "proposed_confidence": {
+      "enum": [
+        "CONFIRMED",
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ]
+    },
+    "root_discriminator": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
