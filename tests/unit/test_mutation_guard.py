@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import subprocess
+
+import pytest
+
+from repo_assurance.security.mutation_guard import (
+    MutationBlockedError,
+    ReadOnlyCommandRunner,
+)
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["git", "push"],
+        ["git", "branch", "-D", "old"],
+        ["git", "reset", "--hard", "HEAD~1"],
+        ["git", "clean", "-fd"],
+        ["git", "stash", "drop"],
+        ["git", "checkout", "main"],
+        ["git", "fetch", "origin"],
+        ["gh", "pr", "merge", "12"],
+        ["gh", "issue", "close", "12"],
+        ["gh", "api", "--method", "POST", "/repos/o/r/issues"],
+        ["gh", "api", "-X", "DELETE", "/repos/o/r/git/refs/heads/old"],
+    ],
+)
+def test_mutating_commands_are_blocked(argv: list[str]) -> None:
+    runner = ReadOnlyCommandRunner(executor=lambda *args, **kwargs: None)
+
+    with pytest.raises(MutationBlockedError):
+        runner.run(argv)
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["git", "status", "--porcelain=v2"],
+        ["git", "rev-parse", "HEAD"],
+        ["git", "branch", "--format=%(refname:short)"],
+        ["git", "worktree", "list", "--porcelain"],
+        ["git", "stash", "list"],
+        ["git", "merge-base", "main", "feature"],
+        ["gh", "api", "/repos/o/r"],
+        ["gh", "api", "--method", "GET", "/repos/o/r/rulesets"],
+        ["gh", "run", "list", "--json", "databaseId,conclusion"],
+        ["gh", "repo", "view", "o/r", "--json", "nameWithOwner"],
+        ["gh", "pr", "list", "--json", "number,state"],
+    ],
+)
+def test_read_only_commands_are_allowed(argv: list[str]) -> None:
+    calls: list[list[str]] = []
+
+    def fake_executor(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    runner = ReadOnlyCommandRunner(executor=fake_executor)
+
+    result = runner.run(argv)
+
+    assert result.returncode == 0
+    assert calls == [argv]
+
+
+def test_unknown_command_family_is_blocked_by_default() -> None:
+    runner = ReadOnlyCommandRunner(executor=lambda *args, **kwargs: None)
+
+    with pytest.raises(MutationBlockedError):
+        runner.run(["curl", "https://example.com"])
+
+
+def test_blocked_command_is_never_executed() -> None:
+    called = False
+
+    def fake_executor(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("must not execute")
+
+    runner = ReadOnlyCommandRunner(executor=fake_executor)
+
+    with pytest.raises(MutationBlockedError):
+        runner.run(["git", "push"])
+
+    assert called is False
