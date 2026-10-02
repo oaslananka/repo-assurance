@@ -191,6 +191,11 @@ def collect_rulesets(
             "name": item.get("name"),
             "enforcement": item.get("enforcement"),
             "target": item.get("target"),
+            "source_type": item.get("source_type"),
+            "source": item.get("source"),
+            "conditions": item.get("conditions"),
+            "bypass_actors": item.get("bypass_actors") or [],
+            "rules": item.get("rules") or [],
         }
         for item in payload
         if isinstance(item, dict)
@@ -200,5 +205,59 @@ def collect_rulesets(
         repository=repository,
         target_commit_sha=target_commit_sha,
         observation={"access_state": GitHubAccessState.AVAILABLE.value, "rulesets": rulesets},
+        access_state=GitHubAccessState.AVAILABLE,
+    )]
+
+
+def collect_default_branch_state(
+    repository: str,
+    branch: str,
+    target_commit_sha: str,
+    *,
+    runner: Runner | None = None,
+) -> list[dict[str, Any]]:
+    transport = runner or ReadOnlyCommandRunner()
+    payload, error = _collect_json(
+        argv=["gh", "api", f"/repos/{repository}/branches/{branch}"],
+        evidence_id="ev_github_default_branch",
+        repository=repository,
+        target_commit_sha=target_commit_sha,
+        runner=transport,
+    )
+    if error is not None:
+        return [error]
+    if not isinstance(payload, dict):
+        return [_make_evidence(
+            evidence_id="ev_github_default_branch",
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            observation={"access_state": "UNKNOWN_ERROR", "error_code": "UNEXPECTED_JSON_SHAPE"},
+            access_state=GitHubAccessState.UNKNOWN_ERROR,
+        )]
+
+    protection = payload.get("protection")
+    required_checks: set[str] = set()
+    if isinstance(protection, dict):
+        status_checks = protection.get("required_status_checks")
+        if isinstance(status_checks, dict):
+            contexts = status_checks.get("contexts")
+            if isinstance(contexts, list):
+                required_checks.update(str(item) for item in contexts if item)
+            checks = status_checks.get("checks")
+            if isinstance(checks, list):
+                for item in checks:
+                    if isinstance(item, dict) and item.get("context"):
+                        required_checks.add(str(item["context"]))
+
+    return [_make_evidence(
+        evidence_id="ev_github_default_branch",
+        repository=repository,
+        target_commit_sha=target_commit_sha,
+        observation={
+            "access_state": GitHubAccessState.AVAILABLE.value,
+            "name": payload.get("name") or branch,
+            "protected": bool(payload.get("protected")),
+            "required_status_checks": sorted(required_checks),
+        },
         access_state=GitHubAccessState.AVAILABLE,
     )]
