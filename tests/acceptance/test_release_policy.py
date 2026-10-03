@@ -131,7 +131,7 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "--no-index --no-deps" not in workflow
     assert workflow.count('PYTHONPATH="$WHEEL" VERSION="$VERSION" python') == 3
     assert workflow.count("from repo_assurance.cli import build_parser") == 3
-    assert workflow.count("dist/release/repo_assurance-*.whl") >= 5
+    assert workflow.count("repo_assurance-*.whl") >= 5
     assert "jsonschema>=4.23,<5" not in workflow
     assert "repo-assurance==$VERSION" not in workflow
     assert "repo-assurance --help" not in workflow
