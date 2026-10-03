@@ -113,4 +113,13 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
         in workflow
     )
     assert "environment:" in workflow
+    assert "name: testpypi" in workflow
     assert "name: pypi" in workflow
+    assert "https://test.pypi.org/legacy/" in workflow
+    assert "- testpypi" in workflow
+    assert "- production" in workflow
+    assert "concurrency:" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert workflow.count("attestations: true") == 2
+    assert "scripts/verify_pypi_release.py" in workflow
+    assert "repo-assurance==$VERSION" in workflow
