@@ -108,6 +108,7 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "sha256sum --check SHA256SUMS" in workflow
     assert "python scripts/build_release.py" not in workflow
     assert "gh release create" in workflow
+    assert 'GH_REPO: ${{ github.repository }}' in workflow
     assert (
         "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33"
         in workflow
