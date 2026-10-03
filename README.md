@@ -186,3 +186,46 @@ step using the already validated artifact set.
 
 See `references/release-policy.md`, `references/release-checklist.md`, and
 `CHANGELOG.md`.
+
+## Cross-agent local use
+
+Repository Assurance uses one canonical skill source at `skills/repository-assurance/SKILL.md`.
+
+Execution order is intentionally portable:
+
+1. **CLI-first** — local coding agents with shell access should run the canonical `repo-assurance` CLI directly.
+2. **MCP-second** — use the Repo Assurance MCP adapter only when the CLI is unavailable and MCP is connected.
+3. **Skill-only fallback** — if neither execution surface can run, use the skill-guided workflow and label the result `PARTIAL_SKILL_GUIDED_AUDIT`.
+
+Claude Code discovers the generated project skill at `.claude/skills/repository-assurance/SKILL.md`. OpenCode uses `.opencode/skills/repository-assurance/SKILL.md`, registered by the minimal project `opencode.json`. Both host copies are exact generated copies of the same canonical source. Codex and other repository-aware coding agents receive the same contract through `AGENTS.md`.
+
+The Claude and OpenCode host skills are exact generated copies of the canonical skill. After editing the canonical source, run:
+
+```bash
+python scripts/sync_agent_assets.py
+python scripts/sync_agent_assets.py --check
+```
+
+The second command is enforced in CI to prevent silent drift.
+
+Host discovery can be smoke-tested locally without running an audit:
+
+```bash
+claude plugin validate .claude/skills
+opencode debug skill --pure
+```
+
+The OpenCode output should contain `repository-assurance` with a location under `.opencode/skills/repository-assurance/SKILL.md`. Codex and other repository-instruction-aware agents use the root `AGENTS.md` contract.
+
+For local CLI use:
+
+```bash
+python -m pip install -e .
+repo-assurance audit --repo . --mode standard
+```
+
+Install the `plugin` extra only when a local stdio MCP host actually needs the MCP adapter:
+
+```bash
+python -m pip install -e '.[plugin]'
+```

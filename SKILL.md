@@ -1,59 +1,19 @@
 ---
 name: repository-assurance-auditing
-description: Use when auditing a GitHub repository, investigating repository health, CI/CD reliability, governance, stale branches or worktrees, security/quality controls, or release readiness.
+description: Use when auditing a GitHub repository, investigating repository health, CI/CD reliability, governance, security/provider controls, or branch/worktree preservation risks.
 ---
 
 # Repository Assurance Auditing
 
-## Overview
+The canonical skill source is `skills/repository-assurance/SKILL.md`.
 
-Audit the repository as an evidence-correlation problem, not as a checklist or another scanner. Establish what is actually observable, which controls are effectively operating, and where evidence is incomplete.
+Before performing an audit, read that file completely and follow it as the authoritative Repository Assurance workflow. Do not duplicate the audit methodology here.
 
-**Core invariants:** audit is **read-only**; bind conclusions to an **exact commit SHA**; **Unknown is not clean**; **Preservation beats cleanup**.
+Compatibility summary:
 
-## Required workflow
+- CLI-first when the local canonical `repo-assurance` engine is executable.
+- MCP-second when the CLI is unavailable but the Repo Assurance MCP adapter is connected.
+- Otherwise use the skill-only fallback and label the result `PARTIAL_SKILL_GUIDED_AUDIT`.
+- Audit execution remains read-only; bind source conclusions to an exact commit SHA; Unknown is not clean/PASS; Preservation beats cleanup.
 
-1. Run discovery and lock the audit target. Record repository, target ref, exact commit SHA, dirty state, and local/remote drift.
-2. Build the repository-specific plan. Every catalog control must be applicable or explicitly not applicable; never silently skip one.
-3. Collect local Git/filesystem evidence, GitHub live state, CI history, and detected provider evidence without mutation.
-4. For time-sensitive claims, obtain **current authoritative evidence**. Prefer official documentation, changelogs, advisories, registries, then upstream sources. If current evidence cannot be verified, report an evidence gap.
-5. Evaluate controls, correlate independent evidence, deduplicate the same underlying issue, and preserve provenance.
-6. Run preservation analysis before recommending branch/worktree/stash cleanup. Local-only commits, detached unique commits, dirty worktrees, or remote-deleted surviving work require preservation/review first.
-7. Report findings, remediation ordering, and **audit completeness**. Keep severity, confidence, priority, and visibility distinct.
-
-Canonical execution:
-
-```bash
-repo-assurance audit --repo <path> --mode standard
-```
-
-Use `quick` for triage and `deep` only when broader dynamic/current evidence is justified. Use `--offline` when GitHub live/API collection or external current-baseline resolution must be skipped; the resulting GitHub/CI-history domains remain unavailable or partial rather than being treated as clean. Do not substitute model memory for current facts.
-
-## Bounded claims
-
-Phrase conclusions to match the evidence window and permissions. “No alerts observed through the available API access” is valid when supported. Never report “No vulnerabilities exist” merely because a provider returned zero findings or an endpoint was inaccessible.
-
-Map inaccessible or incomplete surfaces to explicit states such as `UNKNOWN_PERMISSION`, `UNAVAILABLE`, `PARTIAL`, or `INCONCLUSIVE`; never convert them to PASS.
-
-## Tool and provider recommendations
-
-Do not maximize tool count. Recommend a new provider only when it is available/entitled, applicable to this repository, covers a material gap, adds meaningful incremental assurance, and has acceptable operational noise or cost. Overlap is not automatically redundancy.
-
-## Snapshot and execution provenance
-
-- **Never mix commits into one audit snapshot.** Every finding must retain the exact commit SHA that supplied its source evidence. Cross-branch comparisons are separate observations and must name each branch/SHA explicitly.
-- **Historical CI evidence may span commits by design.** Snapshot immutability applies to source/configuration state, not to bounded operational history. For chronic failure, flakiness, dead-workflow, and reliability analysis, use runs across the declared observation window while preserving each run's `head_sha`, workflow identity, and timestamps. If the workflow definition materially changed during the window, split the history or mark the result partial/mixed-configuration instead of discarding all cross-SHA history.
-- **A deleted remote branch is not itself a preservation finding.** Do not emit `HYGIENE-004`, `HYGIENE-010`, or another preservation-risk candidate unless there is evidence of surviving local/other unique work. A historical SHA with no current remote ref and no local-survival evidence is an observation only. Absence of local evidence is `UNAVAILABLE`/unknown, not proof of surviving work.
-- **Skill-only outputs use explicit provenance.** If `audit_repository` was not actually executed, label the result as `PARTIAL_SKILL_GUIDED_AUDIT` and treat control IDs, finding types, severity, confidence, and priority as advisory candidates unless produced by the canonical engine.
-- **MCP/engine availability is part of provenance.** If the Repo Assurance MCP tools are unavailable, do not present the result as a canonical `quick`, `standard`, or `deep` engine execution. Label it as **`PARTIAL_SKILL_GUIDED_AUDIT`**, identify which engine-backed controls were not executed, and keep their coverage unavailable/partial.
-- For time-sensitive controls, use current authoritative evidence (official documentation, changelog, advisory, or registry data) and pass normalized `baseline-evidence/v1` items to `audit_repository` when the tool is available. If current evidence cannot be verified, keep the control inconclusive.
-
-## Common mistakes
-
-| Mistake | Correct behavior |
-| --- | --- |
-| Old branch ⇒ delete | Check reachability, PR relation, unique commits, worktrees, and stashes first. |
-| Existing workflow ⇒ healthy CI | Inspect retained execution history, chronic failure, flakiness, dead jobs, and enforcement. |
-| Scanner PASS ⇒ effective control | Verify execution freshness, target coverage, and merge enforcement. |
-| 403/hidden data ⇒ zero findings | Record visibility limitation and bound the conclusion. |
-| Current recommendation from memory | Resolve current authoritative evidence or mark it unverified. |
+All detailed evidence, history, provider, current-baseline, and provenance rules live in the canonical skill source.
