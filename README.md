@@ -38,7 +38,7 @@ Before the first PyPI publication, or when an exact Git release is preferred, in
 the tagged source directly:
 
 ```bash
-pipx install "git+https://github.com/oaslananka/repo-assurance.git@v0.2.0"
+pipx install "git+https://github.com/oaslananka/repo-assurance.git@v0.2.1"
 ```
 
 Repository cloning is primarily for development:
@@ -200,7 +200,7 @@ wheel/sdist, plugin ZIP, skill ZIP, and source archive, then emits
 For a local validation on a clean tagged checkout:
 
 ```bash
-python scripts/build_release.py --expected-tag v0.2.0 --output dist/release
+python scripts/build_release.py --expected-tag v0.2.1 --output dist/release
 cd dist/release
 sha256sum --check SHA256SUMS
 ```
