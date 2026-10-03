@@ -176,7 +176,7 @@ jobs:
       url: https://pypi.org/p/repo-assurance
     permissions:
       contents: read
-      id-token: write
+      id-token: write # nosemgrep -- GitHub OIDC permission name; no credential value is stored.
     steps:
       - name: Download validated publication bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
