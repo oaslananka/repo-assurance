@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from repo_assurance.core.schema import validate_document
 
@@ -121,6 +121,148 @@ def _open_alerts(item: Mapping[str, Any] | None) -> list[Mapping[str, Any]]:
     ]
 
 
+def _evaluate_alert_surface(
+    *,
+    item: Mapping[str, Any] | None,
+    control_id: str,
+    repository_subject: Mapping[str, Any],
+    reason_prefix: str,
+    pass_reason: str,
+    build_finding: Callable[[Mapping[str, Any], Sequence[str]], dict[str, Any]],
+    evidence_ids: Sequence[str] | None = None,
+) -> list[dict[str, Any]]:
+    ids = list(evidence_ids or [])
+    if not ids and item and item.get("id"):
+        ids = [str(item["id"])]
+
+    access = _access_state(item)
+    if access != "AVAILABLE":
+        return [
+            _result(
+                control_id,
+                _state_for_access(access),
+                repository_subject,
+                ids,
+                reason=f"{reason_prefix}:{access}",
+            )
+        ]
+
+    alerts = sorted(
+        _open_alerts(item),
+        key=lambda alert: int(alert.get("number") or 0),
+    )
+    if not alerts:
+        return [
+            _result(
+                control_id,
+                "PASS",
+                repository_subject,
+                ids,
+                reason=pass_reason,
+            )
+        ]
+    return [build_finding(alert, ids) for alert in alerts]
+
+
+def _code_scanning_alert_finding(
+    alert: Mapping[str, Any],
+    evidence_ids: Sequence[str],
+) -> dict[str, Any]:
+    number = alert.get("number")
+    rule = alert.get("rule")
+    tool = alert.get("tool")
+    qualifiers: dict[str, Any] = {}
+    if isinstance(tool, Mapping) and tool.get("name"):
+        qualifiers["tool"] = str(tool["name"])
+    if isinstance(rule, Mapping):
+        if rule.get("id"):
+            qualifiers["rule_id"] = str(rule["id"])
+        if rule.get("security_severity_level"):
+            qualifiers["security_severity_level"] = str(
+                rule["security_severity_level"]
+            )
+    return _result(
+        "GH-SEC-002",
+        "FINDING",
+        {
+            "type": "provider_check",
+            "identifier": f"github-code-scanning:{number}",
+            "qualifiers": qualifiers,
+        },
+        evidence_ids,
+        reason=f"open_code_scanning_alert:{number}",
+        candidates=[f"candidate_GH-SEC-002_alert_{number}"],
+    )
+
+
+def _secret_scanning_alert_finding(
+    alert: Mapping[str, Any],
+    evidence_ids: Sequence[str],
+) -> dict[str, Any]:
+    number = alert.get("number")
+    secret_type = alert.get("secret_type")
+    qualifiers = (
+        {"secret_type": str(secret_type)}
+        if secret_type
+        else {}
+    )
+    return _result(
+        "GH-SEC-003",
+        "FINDING",
+        {
+            "type": "provider_check",
+            "identifier": f"github-secret-scanning:{number}",
+            "qualifiers": qualifiers,
+        },
+        evidence_ids,
+        reason=f"open_secret_scanning_alert:{number}",
+        candidates=[f"candidate_GH-SEC-003_alert_{number}"],
+    )
+
+
+def _dependabot_alert_finding(
+    alert: Mapping[str, Any],
+    evidence_ids: Sequence[str],
+) -> dict[str, Any]:
+    number = alert.get("number")
+    dependency = alert.get("dependency")
+    advisory = alert.get("security_advisory")
+    ghsa_id = (
+        advisory.get("ghsa_id")
+        if isinstance(advisory, Mapping)
+        else None
+    )
+    identifier = (
+        str(ghsa_id)
+        if ghsa_id
+        else f"github-dependabot:{number}"
+    )
+    qualifiers: dict[str, Any] = {}
+    if isinstance(dependency, Mapping):
+        for source_key, target_key in (
+            ("package", "package"),
+            ("manifest_path", "manifest_path"),
+            ("scope", "scope"),
+            ("ecosystem", "ecosystem"),
+        ):
+            value = dependency.get(source_key)
+            if value:
+                qualifiers[target_key] = str(value)
+
+    return _result(
+        "DEP-003",
+        "FINDING",
+        {
+            "type": "dependency",
+            "identifier": identifier,
+            "qualifiers": qualifiers,
+        },
+        evidence_ids,
+        reason=f"open_dependabot_alert:{number}",
+        candidates=[f"candidate_DEP-003_alert_{number}"],
+    )
+
+
 def _evaluate_code_scanning_coverage(
     evidence: Sequence[Mapping[str, Any]],
     subject: Mapping[str, Any],
@@ -201,66 +343,14 @@ def _evaluate_code_scanning_alerts(
     evidence: Sequence[Mapping[str, Any]],
     subject: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    alerts = _find(evidence, "ev_github_code_scanning_alerts")
-    access = _access_state(alerts)
-    if access != "AVAILABLE":
-        return [
-            _access_result(
-                control_id="GH-SEC-002",
-                item=alerts,
-                subject=subject,
-                reason_prefix="code_scanning_alert_visibility",
-            )
-        ]
-
-    evidence_ids = [str(alerts["id"])]
-    open_alerts = _open_alerts(alerts)
-    if not open_alerts:
-        return [
-            _result(
-                "GH-SEC-002",
-                "PASS",
-                subject,
-                evidence_ids,
-                reason="code_scanning_alerts_visible:no_open_alerts",
-            )
-        ]
-
-    results: list[dict[str, Any]] = []
-    for alert in sorted(
-        open_alerts,
-        key=lambda item: int(item.get("number") or 0),
-    ):
-        number = alert.get("number")
-        rule = alert.get("rule")
-        tool = alert.get("tool")
-        qualifiers: dict[str, Any] = {}
-        if isinstance(tool, Mapping) and tool.get("name"):
-            qualifiers["tool"] = str(tool["name"])
-        if isinstance(rule, Mapping):
-            if rule.get("id"):
-                qualifiers["rule_id"] = str(rule["id"])
-            if rule.get("security_severity_level"):
-                qualifiers["security_severity_level"] = str(
-                    rule["security_severity_level"]
-                )
-
-        result_subject = {
-            "type": "provider_check",
-            "identifier": f"github-code-scanning:{number}",
-            "qualifiers": qualifiers,
-        }
-        results.append(
-            _result(
-                "GH-SEC-002",
-                "FINDING",
-                result_subject,
-                evidence_ids,
-                reason=f"open_code_scanning_alert:{number}",
-                candidates=[f"candidate_GH-SEC-002_alert_{number}"],
-            )
-        )
-    return results
+    return _evaluate_alert_surface(
+        item=_find(evidence, "ev_github_code_scanning_alerts"),
+        control_id="GH-SEC-002",
+        repository_subject=subject,
+        reason_prefix="code_scanning_alert_visibility",
+        pass_reason="code_scanning_alerts_visible:no_open_alerts",
+        build_finding=_code_scanning_alert_finding,
+    )
 
 
 def _evaluate_secret_scanning(
@@ -336,57 +426,15 @@ def _evaluate_secret_scanning(
             )
         ]
 
-    alert_access = _access_state(alerts)
-    if alert_access != "AVAILABLE":
-        return [
-            _result(
-                "GH-SEC-003",
-                _state_for_access(alert_access),
-                subject,
-                evidence_ids,
-                reason=f"secret_scanning_alert_visibility:{alert_access}",
-            )
-        ]
-
-    open_alerts = _open_alerts(alerts)
-    if not open_alerts:
-        return [
-            _result(
-                "GH-SEC-003",
-                "PASS",
-                subject,
-                evidence_ids,
-                reason="secret_scanning_enabled_and_alerts_visible:no_open_alerts",
-            )
-        ]
-
-    results: list[dict[str, Any]] = []
-    for alert in sorted(
-        open_alerts,
-        key=lambda item: int(item.get("number") or 0),
-    ):
-        number = alert.get("number")
-        secret_type = alert.get("secret_type")
-        qualifiers = (
-            {"secret_type": str(secret_type)}
-            if secret_type
-            else {}
-        )
-        results.append(
-            _result(
-                "GH-SEC-003",
-                "FINDING",
-                {
-                    "type": "provider_check",
-                    "identifier": f"github-secret-scanning:{number}",
-                    "qualifiers": qualifiers,
-                },
-                evidence_ids,
-                reason=f"open_secret_scanning_alert:{number}",
-                candidates=[f"candidate_GH-SEC-003_alert_{number}"],
-            )
-        )
-    return results
+    return _evaluate_alert_surface(
+        item=alerts,
+        control_id="GH-SEC-003",
+        repository_subject=subject,
+        reason_prefix="secret_scanning_alert_visibility",
+        pass_reason="secret_scanning_enabled_and_alerts_visible:no_open_alerts",
+        build_finding=_secret_scanning_alert_finding,
+        evidence_ids=evidence_ids,
+    )
 
 
 def _evaluate_dependency_sbom(
@@ -484,77 +532,14 @@ def _evaluate_dependabot_alerts(
     evidence: Sequence[Mapping[str, Any]],
     subject: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    alerts = _find(evidence, "ev_github_dependabot_alerts")
-    access = _access_state(alerts)
-    if access != "AVAILABLE":
-        return [
-            _access_result(
-                control_id="DEP-003",
-                item=alerts,
-                subject=subject,
-                reason_prefix="dependabot_alert_visibility",
-            )
-        ]
-
-    evidence_ids = [str(alerts["id"])]
-    open_alerts = _open_alerts(alerts)
-    if not open_alerts:
-        return [
-            _result(
-                "DEP-003",
-                "PASS",
-                subject,
-                evidence_ids,
-                reason="dependabot_alerts_visible:no_open_alerts",
-            )
-        ]
-
-    results: list[dict[str, Any]] = []
-    for alert in sorted(
-        open_alerts,
-        key=lambda item: int(item.get("number") or 0),
-    ):
-        number = alert.get("number")
-        dependency = alert.get("dependency")
-        advisory = alert.get("security_advisory")
-        ghsa_id = (
-            advisory.get("ghsa_id")
-            if isinstance(advisory, Mapping)
-            else None
-        )
-        identifier = (
-            str(ghsa_id)
-            if ghsa_id
-            else f"github-dependabot:{number}"
-        )
-        qualifiers: dict[str, Any] = {}
-        if isinstance(dependency, Mapping):
-            if dependency.get("package"):
-                qualifiers["package"] = str(dependency["package"])
-            if dependency.get("manifest_path"):
-                qualifiers["manifest_path"] = str(
-                    dependency["manifest_path"]
-                )
-            if dependency.get("scope"):
-                qualifiers["scope"] = str(dependency["scope"])
-            if dependency.get("ecosystem"):
-                qualifiers["ecosystem"] = str(dependency["ecosystem"])
-
-        results.append(
-            _result(
-                "DEP-003",
-                "FINDING",
-                {
-                    "type": "dependency",
-                    "identifier": identifier,
-                    "qualifiers": qualifiers,
-                },
-                evidence_ids,
-                reason=f"open_dependabot_alert:{number}",
-                candidates=[f"candidate_DEP-003_alert_{number}"],
-            )
-        )
-    return results
+    return _evaluate_alert_surface(
+        item=_find(evidence, "ev_github_dependabot_alerts"),
+        control_id="DEP-003",
+        repository_subject=subject,
+        reason_prefix="dependabot_alert_visibility",
+        pass_reason="dependabot_alerts_visible:no_open_alerts",
+        build_finding=_dependabot_alert_finding,
+    )
 
 
 def evaluate_github_security(

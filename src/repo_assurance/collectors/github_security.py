@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Mapping, Protocol
 
@@ -23,8 +24,6 @@ def _now() -> str:
 
 def _http_error_code(result) -> str:
     text = f"{result.stdout}\n{result.stderr}"
-    import re
-
     match = re.search(r"HTTP\s+(\d{3})", text, re.IGNORECASE)
     return f"HTTP_{match.group(1)}" if match else "GH_COMMAND_FAILED"
 
