@@ -109,3 +109,30 @@ def test_release_build_rejects_dirty_worktree(tmp_path: Path) -> None:
 
     with pytest.raises(module.ReleaseError, match="clean Git worktree"):
         module.assert_clean_worktree(repo)
+
+def test_release_output_path_rejects_destructive_locations(tmp_path: Path) -> None:
+    module = load_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    with pytest.raises(module.ReleaseError, match="repository root or a parent"):
+        module.assert_safe_output_path(repo, repo)
+
+    with pytest.raises(module.ReleaseError, match="repository root or a parent"):
+        module.assert_safe_output_path(repo, tmp_path)
+
+    with pytest.raises(module.ReleaseError, match="must be under dist"):
+        module.assert_safe_output_path(repo, repo / "src" / "release")
+
+
+def test_release_output_path_allows_dist_or_external_directory(tmp_path: Path) -> None:
+    module = load_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    assert module.assert_safe_output_path(
+        repo, repo / "dist" / "release"
+    ) == (repo / "dist" / "release").resolve()
+
+    external = tmp_path / "external-release"
+    assert module.assert_safe_output_path(repo, external) == external.resolve()

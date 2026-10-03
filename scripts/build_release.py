@@ -30,6 +30,7 @@ def _run(
     root: Path,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    """Run an internal argv vector without shell interpretation."""
     return subprocess.run(
         list(argv),
         cwd=root,
@@ -37,6 +38,7 @@ def _run(
         capture_output=True,
         check=False,
         env=env,
+        shell=False,
     )
 
 
@@ -132,6 +134,26 @@ def build_manifest(
     }
 
 
+def assert_safe_output_path(root: Path, output: Path) -> Path:
+    root = root.resolve()
+    output = output.resolve()
+    dist_root = (root / "dist").resolve()
+
+    if output == root or output in root.parents:
+        raise ReleaseError(
+            "release output must not be the repository root or a parent of it"
+        )
+
+    if root in output.parents and not (
+        output == dist_root or dist_root in output.parents
+    ):
+        raise ReleaseError(
+            "release output inside the repository must be under dist/"
+        )
+
+    return output
+
+
 def _source_date_epoch(root: Path) -> str:
     result = _run(["git", "show", "-s", "--format=%ct", "HEAD"], root=root)
     value = result.stdout.strip()
@@ -166,7 +188,7 @@ def build_release(
     assert_expected_tag(root, expected_tag=expected_tag, tag=identity["tag"])
     commit = git_commit(root)
 
-    output = output.resolve()
+    output = assert_safe_output_path(root, output)
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True, exist_ok=True)
