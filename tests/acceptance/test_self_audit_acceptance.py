@@ -22,7 +22,8 @@ def git(repo: Path, *args: str) -> str:
 def init_acceptance_repo(tmp_path: Path) -> tuple[Path, str]:
     repo = tmp_path / "self-audit-fixture"
     repo.mkdir()
-    git(repo, "init", "-b", "main")
+    git(repo, "init")
+    git(repo, "symbolic-ref", "HEAD", "refs/heads/main")
     git(repo, "config", "user.email", "fixture@example.com")
     git(repo, "config", "user.name", "Fixture")
 
