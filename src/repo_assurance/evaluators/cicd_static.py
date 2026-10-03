@@ -47,6 +47,22 @@ def _classify_action_ref(uses: str) -> dict[str, Any]:
     }
 
 
+def _classify_reusable_workflow_ref(uses: str) -> dict[str, Any]:
+    if uses.startswith("./"):
+        return {"uses": uses, "ref_kind": "local", "ref": None}
+    if "@" not in uses:
+        return {"uses": uses, "ref_kind": "unknown", "ref": None}
+
+    _, ref = uses.rsplit("@", 1)
+    if _FULL_SHA_RE.fullmatch(ref):
+        ref_kind = "full_sha"
+    elif _TAG_LIKE_RE.fullmatch(ref):
+        ref_kind = "tag"
+    else:
+        ref_kind = "branch"
+    return {"uses": uses, "ref_kind": ref_kind, "ref": ref}
+
+
 def _permissions(text: str) -> dict[str, Any]:
     lines = _non_comment_lines(text)
     for index, line in enumerate(lines):
@@ -74,13 +90,29 @@ def _permissions(text: str) -> dict[str, Any]:
 def inspect_workflow_source(path: str, text: str) -> dict[str, Any]:
     lines = _non_comment_lines(text)
     actions = []
+    reusable_workflows = []
     runners: set[str] = set()
     false_green: set[str] = set()
+    steps_indent: int | None = None
 
     for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        indent = len(line) - len(line.lstrip())
+        if steps_indent is not None and indent <= steps_indent:
+            steps_indent = None
+        if re.match(r"^steps:\s*(?:#.*)?$", stripped):
+            steps_indent = indent
+
         action_match = _ACTION_RE.match(line)
         if action_match:
-            actions.append(_classify_action_ref(action_match.group(1).strip()))
+            uses = action_match.group(1).strip()
+            if steps_indent is not None and indent > steps_indent:
+                actions.append(_classify_action_ref(uses))
+            else:
+                reusable_workflows.append(_classify_reusable_workflow_ref(uses))
 
         runner_match = _RUNNER_RE.match(line)
         if runner_match:
@@ -102,6 +134,7 @@ def inspect_workflow_source(path: str, text: str) -> dict[str, Any]:
         "path": path,
         "permissions": _permissions(text),
         "actions": actions,
+        "reusable_workflows": reusable_workflows,
         "runners": sorted(runners),
         "false_green_patterns": sorted(false_green),
     }
@@ -319,17 +352,17 @@ def evaluate_ci_static(
         else:
             permission_result = _result("CI-STATIC-003", "PASS", subject, evidence_ids)
 
-    mutable_third_party = sorted({
+    mutable_actions = sorted({
         action["uses"]
         for _, analysis in analyses
         for action in analysis["actions"]
-        if action.get("third_party") and action.get("ref_kind") in {"tag", "branch", "unknown"}
+        if action.get("ref_kind") in {"tag", "branch", "unknown"}
     })
-    if mutable_third_party:
+    if mutable_actions:
         refs_result = _result(
             "CI-STATIC-004", "FINDING", subject, evidence_ids,
-            reason=f"mutable_third_party_action_refs:{','.join(mutable_third_party)}",
-            candidate="candidate_CI-STATIC-004_mutable_third_party_refs",
+            reason=f"mutable_action_refs:{','.join(mutable_actions)}",
+            candidate="candidate_CI-STATIC-004_mutable_action_refs",
         )
     else:
         refs_result = _result("CI-STATIC-004", "PASS", subject, evidence_ids)
