@@ -213,14 +213,15 @@ jobs:
             --version "$VERSION" \
             --release-dir dist/release
 
-      - name: Smoke-test TestPyPI CLI
+      - name: Smoke-test exact TestPyPI-published CLI artifact
         env:
           EXPECTED_TAG: ${{ inputs.expected_tag }}
         run: |
           VERSION="${EXPECTED_TAG#v}"
-          python -m pip install --disable-pip-version-check "jsonschema>=4.23,<5"
-          python -m pip install --disable-pip-version-check --no-deps --retries 10 \
-            --index-url https://test.pypi.org/simple/ "repo-assurance==$VERSION"
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --require-hashes -r requirements/ci.lock
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --no-index --no-deps dist/release/repo_assurance-*.whl
           VERSION="$VERSION" python - <<'PY'
           import importlib.metadata
           import os
@@ -267,14 +268,24 @@ jobs:
             --version "$VERSION" \
             --release-dir dist/release
 
-      - name: Re-smoke TestPyPI CLI before production
+      - name: Re-smoke exact staged CLI artifact before production
         env:
           EXPECTED_TAG: ${{ inputs.expected_tag }}
         run: |
           VERSION="${EXPECTED_TAG#v}"
-          python -m pip install --disable-pip-version-check "jsonschema>=4.23,<5"
-          python -m pip install --disable-pip-version-check --no-deps --retries 10 \
-            --index-url https://test.pypi.org/simple/ "repo-assurance==$VERSION"
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --require-hashes -r requirements/ci.lock
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --no-index --no-deps dist/release/repo_assurance-*.whl
+          VERSION="$VERSION" python - <<'PY'
+          import importlib.metadata
+          import os
+
+          actual = importlib.metadata.version("repo-assurance")
+          expected = os.environ["VERSION"]
+          if actual != expected:
+              raise SystemExit(f"installed version {actual!r} != expected {expected!r}")
+          PY
           repo-assurance --help >/dev/null
 
   publish-pypi:
@@ -346,14 +357,15 @@ jobs:
             --version "$VERSION" \
             --release-dir dist/release
 
-      - name: Smoke-test production CLI
+      - name: Smoke-test exact PyPI-published CLI artifact
         env:
           EXPECTED_TAG: ${{ inputs.expected_tag }}
         run: |
           VERSION="${EXPECTED_TAG#v}"
-          python -m pip install --disable-pip-version-check "jsonschema>=4.23,<5"
-          python -m pip install --disable-pip-version-check --no-deps --retries 10 \
-            --index-url https://pypi.org/simple/ "repo-assurance==$VERSION"
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --require-hashes -r requirements/ci.lock
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --no-index --no-deps dist/release/repo_assurance-*.whl
           VERSION="$VERSION" python - <<'PY'
           import importlib.metadata
           import os

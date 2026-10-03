@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "verify_pypi_release.py"
 
 spec = importlib.util.spec_from_file_location("verify_pypi_release", SCRIPT)
-assert spec is not None and spec.loader is not None
+assert spec is not None
+assert spec.loader is not None
 verify_pypi_release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verify_pypi_release)
 

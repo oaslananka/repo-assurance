@@ -127,4 +127,8 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "cancel-in-progress: false" in workflow
     assert workflow.count("attestations: true") == 2
     assert "scripts/verify_pypi_release.py" in workflow
-    assert "repo-assurance==$VERSION" in workflow
+    assert workflow.count("--only-binary=:all: --require-hashes -r requirements/ci.lock") == 3
+    assert workflow.count("--only-binary=:all: --no-index --no-deps") == 3
+    assert workflow.count("dist/release/repo_assurance-*.whl") >= 5
+    assert "jsonschema>=4.23,<5" not in workflow
+    assert "repo-assurance==$VERSION" not in workflow
