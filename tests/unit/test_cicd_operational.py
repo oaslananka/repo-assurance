@@ -86,6 +86,37 @@ def test_optional_chronic_failure_does_not_claim_required_gate_risk() -> None:
     assert item["reason"] == "workflow_not_required"
 
 
+def test_unknown_required_gate_mapping_is_inconclusive_not_optional() -> None:
+    runs = recent_runs(["success"] * 10)
+
+    results = evaluate_ci_operational(
+        [history("10", runs)],
+        required_workflow_ids=set(),
+        required_mapping_complete=False,
+        now=NOW,
+    )
+
+    item = by_control(results, "CI-OPS-006")
+    assert item["state"] == "INCONCLUSIVE"
+    assert item["reason"] == "required_gate_mapping_incomplete"
+
+
+def test_incomplete_required_mapping_does_not_invent_enforcement_gap() -> None:
+    runs = recent_runs(["success"] * 10)
+
+    results = evaluate_ci_operational(
+        [history("10", runs)],
+        required_workflow_ids=set(),
+        required_mapping_complete=False,
+        expected_blocking_workflow_ids={"10"},
+        now=NOW,
+    )
+
+    item = by_control(results, "CI-OPS-007")
+    assert item["state"] == "INCONCLUSIVE"
+    assert item["reason"] == "required_gate_mapping_incomplete"
+
+
 def test_same_sha_failed_then_rerun_passed_is_flaky_signal() -> None:
     sha = "b" * 40
     runs = [
@@ -164,3 +195,22 @@ def test_permission_limited_history_propagates_unknown_permission() -> None:
     results = evaluate_ci_operational([item], now=NOW)
 
     assert {result["state"] for result in results} == {"UNKNOWN_PERMISSION"}
+
+
+def test_required_gate_results_reference_mapping_evidence() -> None:
+    runs = recent_runs(["success"] * 10)
+
+    results = evaluate_ci_operational(
+        [history("10", runs)],
+        required_workflow_ids={"10"},
+        required_mapping_complete=True,
+        required_gate_evidence_id="ev_required_gate_mapping",
+        now=NOW,
+    )
+
+    for control_id in ("CI-OPS-006", "CI-OPS-007"):
+        item = by_control(results, control_id)
+        assert item["evidence_ids"] == [
+            "ev_history_10",
+            "ev_required_gate_mapping",
+        ]

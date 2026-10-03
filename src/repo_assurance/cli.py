@@ -37,6 +37,10 @@ from repo_assurance.core.completeness import compute_domain_coverage
 from repo_assurance.core.correlation import correlate
 from repo_assurance.core.dedupe import deduplicate_candidates
 from repo_assurance.core.findings import materialize_findings
+from repo_assurance.core.gates import (
+    build_required_gate_mapping_evidence,
+    required_check_names,
+)
 from repo_assurance.core.planner import RepositoryCapabilities, build_audit_plan
 from repo_assurance.core.remediation import build_remediation_tracks
 from repo_assurance.core.schema import validate_document
@@ -231,58 +235,11 @@ def _actions_history_evidence(
     return history, workflow_names
 
 
-def _required_check_names(governance: Sequence[Mapping[str, Any]]) -> set[str]:
-    names: set[str] = set()
-    for item in governance:
-        observation = item.get("observation")
-        if not isinstance(observation, Mapping) or observation.get("access_state") != "AVAILABLE":
-            continue
-
-        if item.get("id") == "ev_github_default_branch":
-            names.update(
-                str(value)
-                for value in observation.get("required_status_checks", [])
-                if value
-            )
-            continue
-
-        if item.get("id") != "ev_github_rulesets":
-            continue
-        rulesets = observation.get("rulesets")
-        if not isinstance(rulesets, list):
-            continue
-        for ruleset in rulesets:
-            if not isinstance(ruleset, Mapping):
-                continue
-            if ruleset.get("enforcement") != "active" or ruleset.get("target") != "branch":
-                continue
-            conditions = ruleset.get("conditions")
-            if not isinstance(conditions, Mapping):
-                continue
-            ref_name = conditions.get("ref_name")
-            if not isinstance(ref_name, Mapping):
-                continue
-            includes = ref_name.get("include") or []
-            excludes = ref_name.get("exclude") or []
-            if "~DEFAULT_BRANCH" not in includes or "~DEFAULT_BRANCH" in excludes:
-                continue
-            rules = ruleset.get("rules")
-            if not isinstance(rules, list):
-                continue
-            for rule in rules:
-                if not isinstance(rule, Mapping) or rule.get("type") != "required_status_checks":
-                    continue
-                parameters = rule.get("parameters")
-                if not isinstance(parameters, Mapping):
-                    continue
-                required = parameters.get("required_status_checks")
-                if not isinstance(required, list):
-                    continue
-                for check in required:
-                    if isinstance(check, Mapping) and check.get("context"):
-                        names.add(str(check["context"]))
-    return names
-
+def _required_check_names(
+    governance: Sequence[Mapping[str, Any]],
+) -> set[str]:
+    """Backward-compatible wrapper over normalized required-check policy parsing."""
+    return required_check_names(governance)
 
 def _blind_spots(coverage: Mapping[str, str]) -> list[dict[str, str]]:
     return [
@@ -385,28 +342,39 @@ def _audit(
 
         if profile.get("github_actions"):
             budget = plan["budgets"]["github"]
-            history, workflow_names = _actions_history_evidence(
+            history, _workflow_names = _actions_history_evidence(
                 repository=full_name,
                 sha=target_sha,
                 max_days=history_days or int(budget["max_history_days"]),
                 max_runs=max_runs or int(budget["max_runs_per_workflow"]),
             )
             evidence.extend(history)
-            required_names = _required_check_names(governance)
-            # Exact workflow-name matching is deliberately conservative; job/check
-            # name correlation requires a richer check-run collector in a later task.
+
+            gate_mapping_evidence = build_required_gate_mapping_evidence(
+                repository=full_name,
+                target_commit_sha=target_sha,
+                governance=governance,
+                history=history,
+            )
+            evidence.append(gate_mapping_evidence)
+            gate_mapping = gate_mapping_evidence["observation"]
             required_workflow_ids = {
-                str(item.get("observation", {}).get("workflow_id"))
-                for item in history
-                if isinstance(item.get("observation"), Mapping)
-                and item.get("observation", {}).get("workflow_name") in required_names
+                str(item)
+                for item in gate_mapping.get("required_workflow_ids", [])
+                if item
             }
-            required_workflow_ids.discard("None")
+
             if history:
                 control_results.extend(
                     evaluate_ci_operational(
                         history,
                         required_workflow_ids=required_workflow_ids,
+                        required_mapping_complete=bool(
+                            gate_mapping.get("complete")
+                        ),
+                        required_gate_evidence_id=str(
+                            gate_mapping_evidence["id"]
+                        ),
                         expected_blocking_workflow_ids=None,
                     )
                 )

@@ -247,17 +247,33 @@ def collect_default_branch_state(
 
     protection = payload.get("protection")
     required_checks: set[str] = set()
+    required_details: dict[str, dict[str, Any]] = {}
     if isinstance(protection, dict):
         status_checks = protection.get("required_status_checks")
         if isinstance(status_checks, dict):
             contexts = status_checks.get("contexts")
             if isinstance(contexts, list):
-                required_checks.update(str(item) for item in contexts if item)
+                for item in contexts:
+                    if not item:
+                        continue
+                    context = str(item)
+                    required_checks.add(context)
+                    required_details.setdefault(
+                        context,
+                        {"context": context, "app_id": None},
+                    )
             checks = status_checks.get("checks")
             if isinstance(checks, list):
                 for item in checks:
-                    if isinstance(item, dict) and item.get("context"):
-                        required_checks.add(str(item["context"]))
+                    if not isinstance(item, dict) or not item.get("context"):
+                        continue
+                    context = str(item["context"])
+                    required_checks.add(context)
+                    app_id = item.get("app_id")
+                    required_details[context] = {
+                        "context": context,
+                        "app_id": app_id if isinstance(app_id, int) and not isinstance(app_id, bool) else None,
+                    }
 
     return [_make_evidence(
         evidence_id="ev_github_default_branch",
@@ -268,6 +284,10 @@ def collect_default_branch_state(
             "name": payload.get("name") or branch,
             "protected": bool(payload.get("protected")),
             "required_status_checks": sorted(required_checks),
+            "required_status_check_details": [
+                required_details[context]
+                for context in sorted(required_details)
+            ],
         },
         access_state=GitHubAccessState.AVAILABLE,
     )]
@@ -303,10 +323,47 @@ def collect_commit_checks(
         for item in payload["check_runs"]
         if isinstance(item, dict) and item.get("name")
     })
+    check_runs: list[dict[str, Any]] = []
+    for raw in payload["check_runs"]:
+        if not isinstance(raw, dict) or not raw.get("name"):
+            continue
+        app = raw.get("app")
+        app_id = app.get("id") if isinstance(app, dict) else None
+        app_slug = app.get("slug") if isinstance(app, dict) else None
+        check_suite = raw.get("check_suite")
+        check_suite_id = check_suite.get("id") if isinstance(check_suite, dict) else None
+
+        workflow_run_id: int | None = None
+        job_id: int | None = None
+        if app_slug == "github-actions":
+            details_url = raw.get("details_url")
+            if isinstance(details_url, str):
+                match = re.search(r"/actions/runs/(\d+)(?:/job/(\d+))?", details_url)
+                if match:
+                    workflow_run_id = int(match.group(1))
+                    if match.group(2):
+                        job_id = int(match.group(2))
+
+        check_runs.append({
+            "id": raw.get("id"),
+            "name": str(raw["name"]),
+            "status": raw.get("status"),
+            "conclusion": raw.get("conclusion"),
+            "app_id": app_id if isinstance(app_id, int) and not isinstance(app_id, bool) else None,
+            "app_slug": str(app_slug) if app_slug else None,
+            "check_suite_id": check_suite_id if isinstance(check_suite_id, int) else None,
+            "workflow_run_id": workflow_run_id,
+            "job_id": job_id,
+        })
+
     return [_make_evidence(
         evidence_id="ev_github_checks",
         repository=repository,
         target_commit_sha=target_commit_sha,
-        observation={"access_state": GitHubAccessState.AVAILABLE.value, "check_names": names},
+        observation={
+            "access_state": GitHubAccessState.AVAILABLE.value,
+            "check_names": names,
+            "check_runs": check_runs,
+        },
         access_state=GitHubAccessState.AVAILABLE,
     )]

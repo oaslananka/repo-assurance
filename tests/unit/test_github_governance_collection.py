@@ -52,6 +52,7 @@ def test_collect_default_branch_state_normalizes_protection() -> None:
             "required_status_checks": {
                 "enforcement_level": "non_admins",
                 "contexts": ["test", "lint"],
+                "checks": [{"context": "test", "app_id": 15368}],
             }
         },
     }))
@@ -61,19 +62,45 @@ def test_collect_default_branch_state_normalizes_protection() -> None:
     assert runner.calls == [["gh", "api", "/repos/acme/demo/branches/main"]]
     assert evidence[0]["observation"]["protected"] is True
     assert evidence[0]["observation"]["required_status_checks"] == ["lint", "test"]
+    assert evidence[0]["observation"]["required_status_check_details"] == [
+        {"context": "lint", "app_id": None},
+        {"context": "test", "app_id": 15368},
+    ]
 
 
-def test_collect_commit_checks_normalizes_check_run_names() -> None:
+def test_collect_commit_checks_normalizes_check_run_identity() -> None:
     runner = FakeRunner(cp({
         "total_count": 3,
         "check_runs": [
-            {"name": "test"},
-            {"name": "lint"},
-            {"name": "test"},
+            {
+                "id": 111,
+                "name": "test",
+                "status": "completed",
+                "conclusion": "success",
+                "details_url": "https://github.com/acme/demo/actions/runs/222/job/111",
+                "app": {"id": 15368, "slug": "github-actions", "name": "GitHub Actions"},
+                "check_suite": {"id": 333},
+            },
+            {"id": 112, "name": "lint", "details_url": "https://github.com/acme/demo/actions/runs/999/job/112", "app": {"id": 42, "slug": "external"}},
+            {"id": 113, "name": "test", "app": {"id": 15368, "slug": "github-actions"}},
         ],
     }))
 
     evidence = collect_commit_checks("acme/demo", "a" * 40, runner=runner)
 
     assert runner.calls == [["gh", "api", "/repos/acme/demo/commits/" + "a" * 40 + "/check-runs?per_page=100"]]
-    assert evidence[0]["observation"]["check_names"] == ["lint", "test"]
+    observation = evidence[0]["observation"]
+    assert observation["check_names"] == ["lint", "test"]
+    first = observation["check_runs"][0]
+    assert first["id"] == 111
+    assert first["name"] == "test"
+    assert first["app_id"] == 15368
+    assert first["app_slug"] == "github-actions"
+    assert first["check_suite_id"] == 333
+    assert first["workflow_run_id"] == 222
+    assert first["job_id"] == 111
+
+    external = observation["check_runs"][1]
+    assert external["app_slug"] == "external"
+    assert external["workflow_run_id"] is None
+    assert external["job_id"] is None
