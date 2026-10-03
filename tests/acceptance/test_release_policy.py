@@ -113,6 +113,8 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     )[1]
     assert 'GH_REPO: ${{ github.repository }}' in github_release_step
     assert '--repo "$GITHUB_REPOSITORY"' in github_release_step
+    assert "gh release download" in github_release_step
+    assert "Existing GitHub Release matches validated artifact set" in github_release_step
     assert (
         "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33"
         in workflow
