@@ -75,4 +75,3 @@ Release automation must preserve:
 - no mutation of repository source during artifact construction.
 
 A version number alone is not evidence that a release is approved or published.
-

@@ -15,4 +15,3 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
 ### Added
 
 - Evidence-driven repository assurance engine, CLI, control catalogs, reports, ChatGPT plugin adapter, standalone skill, GitHub governance analysis, CI operational analysis, Git hygiene, provider/security assurance, and current-baseline support.
-

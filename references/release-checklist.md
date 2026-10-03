@@ -32,4 +32,3 @@ Use this checklist for an official `vX.Y.Z` release candidate.
 - [ ] Verify published artifacts/checksums against the validated manifest.
 - [ ] Record release notes and publication references.
 - [ ] Reopen `[Unreleased]` for subsequent development.
-
