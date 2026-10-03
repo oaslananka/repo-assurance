@@ -33,7 +33,6 @@ jobs:
       - name: Verify validation run and exact tag
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           EXPECTED_TAG: ${{ inputs.expected_tag }}
           VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
         run: |
@@ -158,6 +157,7 @@ jobs:
       - name: Create GitHub Release from validated artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           EXPECTED_TAG: ${{ inputs.expected_tag }}
         run: |
           if gh release view "$EXPECTED_TAG" >/dev/null 2>&1; then
