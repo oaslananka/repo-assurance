@@ -14,6 +14,8 @@ OPENCODE_SKILL = ROOT / ".opencode" / "skills" / "repository-assurance" / "SKILL
 def expected_assets() -> dict[Path, bytes]:
     if not CANONICAL_SKILL.is_file():
         raise FileNotFoundError(CANONICAL_SKILL)
+    # Host skills are exact generated replicas. Byte comparison is intentional:
+    # text/newline normalization would hide encoding or line-ending drift.
     content = CANONICAL_SKILL.read_bytes()
     return {CLAUDE_SKILL: content, OPENCODE_SKILL: content}
 

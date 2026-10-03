@@ -68,6 +68,20 @@ def test_repo_agent_instructions_point_to_canonical_skill_and_execution_order() 
     assert "explicitly requested development work may edit" in text
 
 
+
+def test_root_wrapper_description_matches_canonical_skill() -> None:
+    canonical_description = next(
+        line
+        for line in CANONICAL.read_text(encoding="utf-8").splitlines()
+        if line.startswith("description: ")
+    )
+    root_description = next(
+        line
+        for line in ROOT_SKILL.read_text(encoding="utf-8").splitlines()
+        if line.startswith("description: ")
+    )
+    assert root_description == canonical_description
+
 def test_root_skill_is_thin_compatibility_wrapper() -> None:
     text = ROOT_SKILL.read_text(encoding="utf-8")
 

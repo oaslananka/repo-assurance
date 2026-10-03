@@ -1,6 +1,6 @@
 ---
 name: repository-assurance-auditing
-description: Use when auditing a GitHub repository, investigating repository health, CI/CD reliability, governance, security/provider controls, or branch/worktree preservation risks.
+description: Use when auditing a local Git repository or GitHub-backed repository for evidence-grounded repository health, CI/CD reliability, governance, security/provider controls, and branch/worktree preservation risks.
 ---
 
 # Repository Assurance Auditing
