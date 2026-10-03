@@ -105,14 +105,29 @@ def _collect_json(
             access_state=state,
         )
         return None, evidence
-    try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError:
+    if result.stdout is None:
         evidence = _make_evidence(
             evidence_id=evidence_id,
             repository=repository,
             target_commit_sha=target_commit_sha,
-            observation={"access_state": GitHubAccessState.UNKNOWN_ERROR.value, "error_code": "MALFORMED_JSON"},
+            observation={
+                "access_state": GitHubAccessState.UNKNOWN_ERROR.value,
+                "error_code": "MISSING_STDOUT",
+            },
+            access_state=GitHubAccessState.UNKNOWN_ERROR,
+        )
+        return None, evidence
+    try:
+        payload = json.loads(result.stdout)
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
+        evidence = _make_evidence(
+            evidence_id=evidence_id,
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            observation={
+                "access_state": GitHubAccessState.UNKNOWN_ERROR.value,
+                "error_code": "MALFORMED_JSON",
+            },
             access_state=GitHubAccessState.UNKNOWN_ERROR,
         )
         return None, evidence
