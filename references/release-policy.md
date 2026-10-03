@@ -48,9 +48,9 @@ Official artifacts MUST be built from a clean worktree whose HEAD is exactly the
 
 Generated output under `dist/` is ignored by Git and is not part of the source state.
 
-## CI and GitHub release validation
+## Release validation
 
-The release workflow runs on `v*` tags and explicit `workflow_dispatch` validation. It:
+The Release Validation workflow runs on `v*` tags and explicit `workflow_dispatch` validation. It:
 
 1. checks out the exact requested tag with full history;
 2. uses the repository's pinned CPython baseline;
@@ -60,9 +60,25 @@ The release workflow runs on `v*` tags and explicit `workflow_dispatch` validati
 6. verifies `SHA256SUMS`;
 7. uploads the release artifact directory as a GitHub Actions artifact.
 
-The workflow is deliberately **non-publishing**. It uses read-only repository permissions and does not publish to PyPI, create a GitHub Release, update a plugin registry, or deploy anything.
+Release Validation is deliberately **non-publishing**. It uses read-only repository permissions and does not publish to PyPI, create a GitHub Release, update a plugin registry, or deploy anything.
 
-Creating a public GitHub Release or publishing any artifact to an external registry requires **explicit authorization** and is a separate action after the validated artifact set exists.
+## Authorized publication
+
+Creating a public GitHub Release or publishing to PyPI requires **explicit authorization** after a successful Release Validation run.
+
+`.github/workflows/publish.yml` is manual-only and accepts:
+
+- the exact existing release tag;
+- the successful Release Validation workflow run ID for that tag;
+- a publication target: `github`, `pypi`, or `both`.
+
+The publication workflow does not rebuild the project. It verifies that the supplied run is a successful Release Validation run for the exact tag commit, downloads that run's named artifact set, verifies `SHA256SUMS` and `release-manifest.json`, and then republishes those exact bytes.
+
+GitHub Release publication attaches the complete validated artifact set. PyPI publication selects only the validated wheel and source distribution.
+
+PyPI publication uses OpenID Connect Trusted Publishing through the protected GitHub environment named `pypi`; no long-lived PyPI API token belongs in repository secrets. The corresponding PyPI Trusted Publisher configuration is a one-time external prerequisite for the first upload.
+
+If one external publication target succeeds and another fails, rerun the workflow only for the failed target. Do not rebuild or silently replace an already published version.
 
 ## Security and provenance
 
@@ -70,8 +86,10 @@ Release automation must preserve:
 
 - exact-SHA provenance;
 - full-SHA-pinned remote GitHub Actions;
-- locked dependency installation;
+- locked dependency installation during validation;
 - no secret-bearing publishing credentials in the validation workflow;
-- no mutation of repository source during artifact construction.
+- PyPI Trusted Publishing with short-lived OIDC identity;
+- no mutation of repository source during artifact construction;
+- publication only from the already validated artifact set.
 
 A version number alone is not evidence that a release is approved or published.

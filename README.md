@@ -18,19 +18,44 @@ The current MVP vertical slice focuses on:
 
 External provider assurance now includes a versioned provider-state contract and initial SonarQube Cloud / Socket GitHub-check adapters. Check execution is treated as execution evidence only; provider issue/alert inventories remain explicit gaps until direct provider evidence is available.
 
+## Installation
+
+For a published CLI release, `pipx` is the recommended installation method because
+it keeps the command isolated from application environments:
+
+```bash
+pipx install repo-assurance
+repo-assurance audit --repo . --mode standard
+```
+
+A regular Python environment can use `pip` instead:
+
+```bash
+python -m pip install repo-assurance
+```
+
+Before the first PyPI publication, or when an exact Git release is preferred, install
+the tagged source directly:
+
+```bash
+pipx install "git+https://github.com/oaslananka/repo-assurance.git@v0.2.0"
+```
+
+Repository cloning is primarily for development:
+
+```bash
+git clone https://github.com/oaslananka/repo-assurance.git
+cd repo-assurance
+python -m pip install -e '.[dev,plugin]'
+pytest -q
+```
+
 ## Requirements
 
 - Python 3.12+
 - Git
 - `gh` for GitHub live-state collection (audits degrade explicitly when it is unavailable)
 - `actionlint` for first-class GitHub Actions syntax/semantic validation (CI-STATIC-001 becomes explicit `UNAVAILABLE` when it is not installed)
-
-Development compatibility install:
-
-```bash
-python -m pip install -e '.[dev,plugin]'
-pytest -q
-```
 
 The required CI lane uses a reproducible dependency baseline instead of resolving
 ranges on every run:
@@ -175,14 +200,19 @@ wheel/sdist, plugin ZIP, skill ZIP, and source archive, then emits
 For a local validation on a clean tagged checkout:
 
 ```bash
-python scripts/build_release.py --expected-tag v0.1.1 --output dist/release
+python scripts/build_release.py --expected-tag v0.2.0 --output dist/release
 cd dist/release
 sha256sum --check SHA256SUMS
 ```
 
 The validation workflow does **not** publish to PyPI, create a GitHub Release, deploy,
 or update external plugin registries. Publication is a separate owner-authorized
-step using the already validated artifact set.
+manual workflow that takes the exact release tag and successful validation run ID,
+then reuses the already validated artifact bytes without rebuilding them.
+
+PyPI uses Trusted Publishing through the GitHub environment named `pypi`. The
+one-time PyPI publisher configuration must name this repository and
+`.github/workflows/publish.yml`.
 
 See `references/release-policy.md`, `references/release-checklist.md`, and
 `CHANGELOG.md`.
@@ -229,3 +259,8 @@ Install the `plugin` extra only when a local stdio MCP host actually needs the M
 ```bash
 python -m pip install -e '.[plugin]'
 ```
+
+
+## License
+
+Repo Assurance is distributed under the MIT License. See [`LICENSE`](LICENSE).
