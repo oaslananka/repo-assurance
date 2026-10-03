@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILL = ROOT / "SKILL.md"
+SKILL = ROOT / "skills" / "repository-assurance" / "SKILL.md"
 
 
 def skill_text() -> str:
@@ -13,7 +13,7 @@ def skill_text() -> str:
 
 def test_skill_has_discoverable_frontmatter() -> None:
     text = skill_text()
-    assert text.startswith("---\nname: repository-assurance-auditing\n")
+    assert text.startswith("---\nname: repository-assurance\n")
     assert "description: Use when" in text.split("---", 2)[1]
 
 
@@ -21,8 +21,8 @@ def test_skill_encodes_core_safety_and_evidence_invariants() -> None:
     text = skill_text()
     required = [
         "read-only",
-        "exact commit SHA",
-        "Unknown is not clean",
+        "exact audited commit SHA",
+        "Unknown is not PASS",
         "Preservation beats cleanup",
         "current authoritative evidence",
         "audit completeness",

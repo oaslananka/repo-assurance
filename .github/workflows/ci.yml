@@ -42,6 +42,9 @@ jobs:
           python scripts/update_ci_lock.py
           git diff --exit-code -- requirements/ci.lock
 
+      - name: Verify cross-agent skill assets
+        run: python scripts/sync_agent_assets.py --check
+
       - name: Run test suite
         run: pytest -q
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILL = ROOT / "SKILL.md"
+SKILL = ROOT / "skills" / "repository-assurance" / "SKILL.md"
 
 
 def skill_text() -> str:
