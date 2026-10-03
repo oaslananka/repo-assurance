@@ -25,6 +25,49 @@ _IGNORED_DIRS = {
     ".mypy_cache",
     ".pytest_cache",
 }
+_LOCKFILE_NAMES = {
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "poetry.lock",
+    "uv.lock",
+    "Pipfile.lock",
+}
+_CONSTRAINT_FILENAMES = {
+    "constraints.txt",
+    "requirements/constraints.txt",
+}
+
+
+def _dependency_reproducibility(paths: set[str]) -> tuple[list[str], dict[str, object]]:
+    lockfiles = sorted(
+        path
+        for path in paths
+        if path in _LOCKFILE_NAMES
+        or (
+            path.startswith("requirements/")
+            and path.endswith(".lock")
+        )
+    )
+    if lockfiles:
+        return lockfiles, {
+            "state": "LOCKED_BASELINE_OBSERVED",
+            "artifacts": lockfiles,
+        }
+
+    constraints = sorted(path for path in paths if path in _CONSTRAINT_FILENAMES)
+    if constraints:
+        return [], {
+            "state": "CONSTRAINTS_BASELINE_OBSERVED",
+            "artifacts": constraints,
+        }
+
+    return [], {
+        "state": "NOT_OBSERVED",
+        "artifacts": [],
+    }
+
+
 _LANGUAGE_SUFFIXES = {
     ".py": "python",
     ".js": "javascript",
@@ -123,18 +166,21 @@ def discover_repository_profile(repo: Path) -> dict[str, object]:
     package_json = _load_package_json(repo)
     pyproject = _load_pyproject(repo)
 
+    source_files = list(_iter_source_files(repo))
     languages = sorted(
         {
             language
-            for relative, _ in _iter_source_files(repo)
+            for relative, _ in source_files
             if (language := _LANGUAGE_SUFFIXES.get(relative.suffix.lower())) is not None
         }
     )
 
-    lockfiles = sorted(
-        name
-        for name in ("package-lock.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "uv.lock", "Pipfile.lock")
-        if (repo / name).is_file()
+    relative_paths = {
+        relative.as_posix()
+        for relative, _ in source_files
+    }
+    lockfiles, dependency_reproducibility = _dependency_reproducibility(
+        relative_paths
     )
 
     package_managers: set[str] = set()
@@ -179,12 +225,11 @@ def discover_repository_profile(repo: Path) -> dict[str, object]:
         "languages": languages,
         "package_managers": sorted(package_managers),
         "lockfiles": lockfiles,
+        "dependency_reproducibility": dependency_reproducibility,
         "github_actions": github_actions,
         "build_command_candidates": sorted(set(build_commands)),
         "test_command_candidates": sorted(set(test_commands)),
     }
-
-
 
 
 def discover_repository_profile_at_commit(repo: Path, target_commit_sha: str) -> dict[str, object]:
@@ -223,10 +268,8 @@ def discover_repository_profile_at_commit(repo: Path, target_commit_sha: str) ->
         if (language := _LANGUAGE_SUFFIXES.get(Path(relative).suffix.lower())) is not None
     })
 
-    lockfiles = sorted(
-        name
-        for name in ("package-lock.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "uv.lock", "Pipfile.lock")
-        if name in path_set
+    lockfiles, dependency_reproducibility = _dependency_reproducibility(
+        path_set
     )
 
     package_managers: set[str] = set()
@@ -287,10 +330,12 @@ def discover_repository_profile_at_commit(repo: Path, target_commit_sha: str) ->
         "languages": languages,
         "package_managers": sorted(package_managers),
         "lockfiles": lockfiles,
+        "dependency_reproducibility": dependency_reproducibility,
         "github_actions": github_actions,
         "build_command_candidates": sorted(set(build_commands)),
         "test_command_candidates": sorted(set(test_commands)),
     }
+
 
 def evaluate_repository_profile(profile_evidence: dict[str, Any]) -> list[dict[str, Any]]:
     from datetime import datetime, timezone
