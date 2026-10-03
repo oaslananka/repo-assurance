@@ -12,7 +12,7 @@ def test_plugin_manifest_is_agent_plugins_v1() -> None:
     manifest = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
     assert manifest["$schema"] == "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
     assert manifest["name"] == "repo-assurance"
-    assert manifest["version"] == "0.2.0"
+    assert manifest["version"] == "0.2.1"
     interface = manifest["extensions"]["com.openai"]["interface"]
     assert interface["displayName"] == "Repo Assurance"
     assert len(interface["shortDescription"]) <= 30
