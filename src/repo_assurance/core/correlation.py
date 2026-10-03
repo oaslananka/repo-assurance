@@ -237,6 +237,45 @@ def correlate(
             candidates.append(candidate)
             materialized_result_ids.add(id(result))
 
+    # Provider dependency advisories share the same canonical root identity as
+    # GitHub dependency advisories so the same upstream advisory can dedupe across
+    # providers.
+    provider_dependency_results = sorted(
+        (
+            result
+            for result in by_control.get("PROV-003", [])
+            if result.get("state") == "FINDING"
+            and id(result) not in materialized_result_ids
+            and isinstance(result.get("subject"), Mapping)
+            and result["subject"].get("type") == "dependency"
+        ),
+        key=_subject_identifier,
+    )
+    for result in provider_dependency_results:
+        subject, referenced = _ground_result(
+            result,
+            control_id="PROV-003",
+            evidence_ids=evidence_ids,
+        )
+        for candidate_id in _fallback_candidate_ids(
+            result,
+            control_id="PROV-003",
+        ):
+            candidate = {
+                "schema_version": "candidate-finding/v1",
+                "candidate_id": candidate_id,
+                "control_id": "PROV-003",
+                "subject": subject,
+                "type": "DEPENDENCY_VULNERABILITY",
+                "evidence_ids": referenced,
+                "proposed_severity": "MEDIUM",
+                "proposed_confidence": "HIGH",
+                "root_discriminator": "dependency-advisory",
+            }
+            validate_document("candidate-finding.v1", candidate)
+            candidates.append(candidate)
+        materialized_result_ids.add(id(result))
+
     # Fail-safe materialization contract: a grounded material negative result must
     # never disappear merely because a specialized correlation rule has not yet
     # been registered. Specialized rules above remain authoritative when present.

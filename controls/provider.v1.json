@@ -1,0 +1,90 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "external-providers",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "PROV-001",
+      "title": "External provider execution is evaluated",
+      "domain": "external-providers",
+      "description": "Observed external assurance-provider checks are evaluated for exact-target execution state without treating provider execution as overall provider assurance.",
+      "evaluator": "providers.execution",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["provider_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "PROV-002",
+      "title": "Provider issue inventory visibility is evaluated",
+      "domain": "external-providers",
+      "description": "Provider issue or alert inventory visibility is explicit and missing provider API access is not interpreted as an empty inventory.",
+      "evaluator": "providers.inventory_visibility",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["provider_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "PROV-003",
+      "title": "Provider findings are evaluated and correlated",
+      "domain": "external-providers",
+      "description": "Open provider findings are normalized without inventing issue-free status when provider inventory visibility is unavailable.",
+      "evaluator": "providers.findings",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["provider_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}

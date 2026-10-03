@@ -40,6 +40,11 @@ from repo_assurance.collectors.github_security import (
     collect_dependabot_alerts,
     collect_secret_scanning_alerts,
 )
+from repo_assurance.collectors.providers import (
+    collect_provider_discovery,
+    collect_provider_states,
+    provider_summaries,
+)
 from repo_assurance.core.catalog import load_catalog, validate_catalog_document
 from repo_assurance.core.completeness import compute_domain_coverage
 from repo_assurance.core.correlation import correlate
@@ -48,6 +53,7 @@ from repo_assurance.core.findings import materialize_findings
 from repo_assurance.core.gates import (
     build_required_gate_mapping_evidence,
     required_check_names,
+    required_check_requirements,
 )
 from repo_assurance.core.planner import RepositoryCapabilities, build_audit_plan
 from repo_assurance.core.remediation import build_remediation_tracks
@@ -60,6 +66,7 @@ from repo_assurance.evaluators.cicd_static import (
 from repo_assurance.evaluators.governance import evaluate_governance
 from repo_assurance.evaluators.github_security import evaluate_github_security
 from repo_assurance.evaluators.hygiene import evaluate_hygiene
+from repo_assurance.evaluators.providers import evaluate_providers
 from repo_assurance.evaluators.repository import (
     discover_repository_profile,
     discover_repository_profile_at_commit,
@@ -326,6 +333,7 @@ def _audit(
         *discovery["snapshot_evidence"],
     ]
     control_results: list[dict[str, Any]] = []
+    providers: list[dict[str, Any]] = []
     control_results.extend(evaluate_snapshot(evidence))
 
     profile_evidence = collect_repository_profile_evidence(
@@ -369,6 +377,23 @@ def _audit(
         governance = _governance_evidence(full_name, target_branch, target_sha)
         evidence.extend(governance)
         control_results.extend(evaluate_governance(governance))
+
+        github_checks = next(
+            (item for item in governance if item.get("id") == "ev_github_checks"),
+            None,
+        )
+        provider_evidence: list[dict[str, Any]] = []
+        provider_states: list[dict[str, Any]] = []
+        if github_checks is not None:
+            provider_discovery = collect_provider_discovery(github_checks)
+            provider_states = collect_provider_states(
+                github_checks,
+                required_checks=required_check_requirements(governance),
+            )
+            provider_evidence = [provider_discovery, *provider_states]
+            evidence.extend(provider_evidence)
+        control_results.extend(evaluate_providers(provider_evidence))
+        providers = provider_summaries(provider_states)
 
         security_evidence = _github_security_evidence(full_name, target_sha)
         evidence.extend(security_evidence)
@@ -451,7 +476,7 @@ def _audit(
         audit_plan=plan,
         coverage=coverage,
         control_results=control_results,
-        providers=[],
+        providers=providers,
         findings=findings,
         observations=[],
         blind_spots=_blind_spots(coverage),

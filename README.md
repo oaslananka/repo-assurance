@@ -16,7 +16,7 @@ The current MVP vertical slice focuses on:
 - stale/local-only branch and worktree preservation risks;
 - deterministic correlation, deduplication, completeness, and reports.
 
-Third-party provider adapters (Codecov, SonarQube Cloud, Semgrep, Codacy, Mergify, etc.) remain gated until the core exit criteria are satisfied.
+External provider assurance now includes a versioned provider-state contract and initial SonarQube Cloud / Socket GitHub-check adapters. Check execution is treated as execution evidence only; provider issue/alert inventories remain explicit gaps until direct provider evidence is available.
 
 ## Requirements
 

@@ -218,3 +218,73 @@ def test_operational_and_governance_types_get_specific_titles() -> None:
 
     for finding_type, title in cases:
         assert by_type[finding_type]["title"] == title
+
+def test_markdown_renders_provider_state_without_claiming_inventory_health() -> None:
+    provider = {
+        "schema_version": "provider-state/v1",
+        "provider": {
+            "id": "sonarqube-cloud",
+            "display_name": "SonarQube Cloud",
+            "adapter_id": "sonarqube-cloud/v1",
+            "known_adapter": True,
+        },
+        "discovery": {
+            "mechanism": "github_check_run",
+            "check_run_id": 1,
+            "app_id": 12526,
+            "app_slug": "sonarqubecloud",
+        },
+        "capabilities": ["issue_inventory", "quality_gate"],
+        "entitlement": {"state": "UNKNOWN"},
+        "execution": {
+            "observed": True,
+            "check_name": "SonarCloud Code Analysis",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-10-03T00:00:00Z",
+            "completed_at": "2026-10-03T00:01:00Z",
+        },
+        "coverage": {
+            "target_commit_sha": "b" * 40,
+            "target_binding": "ATTACHED",
+            "scan_scope": "OBSERVED",
+            "scope": {"project_key": "acme_demo", "branch": "main"},
+        },
+        "inventory": {
+            "access_state": "UNAVAILABLE",
+            "reason": "provider_inventory_not_connected",
+            "items": [],
+        },
+        "enforcement": {"state": "NOT_REQUIRED"},
+        "evidence_gaps": ["provider_issue_inventory"],
+    }
+    report = build_audit_report(
+        audit_id="audit_1",
+        mode="standard",
+        started_at="2026-10-03T00:00:00Z",
+        completed_at="2026-10-03T00:01:00Z",
+        baseline_as_of="2026-10-03",
+        repository={"full_name": "acme/demo"},
+        snapshot={"target_branch": "main", "target_commit_sha": "b" * 40},
+        profile={},
+        audit_plan=base_plan(),
+        coverage={"external_providers": "PARTIAL"},
+        control_results=[],
+        providers=[provider],
+        findings=[],
+        observations=[],
+        blind_spots=[{
+            "domain": "external_providers",
+            "summary": "Provider inventory visibility is partial.",
+        }],
+        remediation_tracks=[],
+    )
+
+    markdown = render_markdown(report)
+
+    assert "## External Providers" in markdown
+    assert "SonarQube Cloud" in markdown
+    assert "`sonarqube-cloud/v1`" in markdown
+    assert "success" in markdown
+    assert "UNAVAILABLE" in markdown
+    assert "No provider issues exist" not in markdown

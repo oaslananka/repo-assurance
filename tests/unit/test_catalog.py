@@ -91,6 +91,7 @@ def test_shipped_catalog_contains_exact_first_slice_controls() -> None:
         "GH-GOV-001", "GH-GOV-003", "GH-GOV-007", "GH-GOV-008",
         "GH-SEC-001", "GH-SEC-002", "GH-SEC-003",
         "DEP-001", "DEP-002", "DEP-003",
+        "PROV-001", "PROV-002", "PROV-003",
         "CI-STATIC-001", "CI-STATIC-003", "CI-STATIC-004", "CI-STATIC-006", "CI-STATIC-008",
         "CI-OPS-001", "CI-OPS-002", "CI-OPS-003", "CI-OPS-005", "CI-OPS-006", "CI-OPS-007", "CI-OPS-008",
         "HYGIENE-001", "HYGIENE-003", "HYGIENE-004", "HYGIENE-005", "HYGIENE-008", "HYGIENE-010",

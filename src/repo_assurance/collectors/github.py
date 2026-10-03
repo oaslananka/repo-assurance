@@ -4,6 +4,7 @@ import json
 import re
 from datetime import datetime, timezone
 from enum import StrEnum
+from urllib.parse import parse_qs, urlparse
 from typing import Any, Protocol
 
 from repo_assurance.core.schema import validate_document
@@ -338,6 +339,7 @@ def collect_commit_checks(
         app = raw.get("app")
         app_id = app.get("id") if isinstance(app, dict) else None
         app_slug = app.get("slug") if isinstance(app, dict) else None
+        app_name = app.get("name") if isinstance(app, dict) else None
         check_suite = raw.get("check_suite")
         check_suite_id = check_suite.get("id") if isinstance(check_suite, dict) else None
 
@@ -352,6 +354,26 @@ def collect_commit_checks(
                     if match.group(2):
                         job_id = int(match.group(2))
 
+        details_host: str | None = None
+        details_path = ""
+        details_query: dict[str, str] = {}
+        details_url = raw.get("details_url")
+        if (
+            app_slug in {"sonarqubecloud", "socket-security"}
+            and isinstance(details_url, str)
+            and details_url
+        ):
+            parsed = urlparse(details_url)
+            details_host = parsed.hostname
+            details_path = parsed.path
+            if app_slug == "sonarqubecloud":
+                query = parse_qs(parsed.query, keep_blank_values=False)
+                details_query = {
+                    key: values[0]
+                    for key, values in query.items()
+                    if key in {"id", "branch"} and values
+                }
+
         check_runs.append({
             "id": raw.get("id"),
             "name": str(raw["name"]),
@@ -359,6 +381,12 @@ def collect_commit_checks(
             "conclusion": raw.get("conclusion"),
             "app_id": app_id if isinstance(app_id, int) and not isinstance(app_id, bool) else None,
             "app_slug": str(app_slug) if app_slug else None,
+            "app_name": str(app_name) if app_name else None,
+            "started_at": raw.get("started_at"),
+            "completed_at": raw.get("completed_at"),
+            "details_host": details_host,
+            "details_path": details_path,
+            "details_query": details_query,
             "check_suite_id": check_suite_id if isinstance(check_suite_id, int) else None,
             "workflow_run_id": workflow_run_id,
             "job_id": job_id,

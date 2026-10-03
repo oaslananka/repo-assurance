@@ -104,3 +104,61 @@ def test_collect_commit_checks_normalizes_check_run_identity() -> None:
     assert external["app_slug"] == "external"
     assert external["workflow_run_id"] is None
     assert external["job_id"] is None
+
+def test_provider_check_metadata_is_safely_normalized() -> None:
+    runner = FakeRunner(cp({
+        "total_count": 1,
+        "check_runs": [{
+            "id": 200,
+            "name": "SonarCloud Code Analysis",
+            "status": "completed",
+            "conclusion": "success",
+            "details_url": "https://sonarcloud.io/dashboard?id=acme_demo&branch=main&token=do-not-store-me",
+            "started_at": "2026-10-03T02:59:00Z",
+            "completed_at": "2026-10-03T03:00:00Z",
+            "app": {
+                "id": 12526,
+                "slug": "sonarqubecloud",
+                "name": "SonarQubeCloud",
+            },
+            "check_suite": {"id": 444},
+        }],
+    }))
+
+    evidence = collect_commit_checks("acme/demo", "a" * 40, runner=runner)
+
+    check = evidence[0]["observation"]["check_runs"][0]
+    assert "details_url" not in check
+    assert check["app_name"] == "SonarQubeCloud"
+    assert check["started_at"] == "2026-10-03T02:59:00Z"
+    assert check["completed_at"] == "2026-10-03T03:00:00Z"
+    assert check["details_host"] == "sonarcloud.io"
+    assert check["details_path"] == "/dashboard"
+    assert check["details_query"] == {"id": "acme_demo", "branch": "main"}
+    assert "token" not in repr(check)
+
+def test_unknown_provider_details_path_is_not_persisted() -> None:
+    runner = FakeRunner(cp({
+        "total_count": 1,
+        "check_runs": [{
+            "id": 201,
+            "name": "Acme Security",
+            "status": "completed",
+            "conclusion": "success",
+            "details_url": "https://example.invalid/run/opaque-secret-value?token=do-not-store",
+            "app": {
+                "id": 999,
+                "slug": "acme-security",
+                "name": "Acme Security",
+            },
+        }],
+    }))
+
+    evidence = collect_commit_checks("acme/demo", "a" * 40, runner=runner)
+
+    check = evidence[0]["observation"]["check_runs"][0]
+    assert check["details_host"] is None
+    assert check["details_path"] == ""
+    assert check["details_query"] == {}
+    assert "opaque-secret-value" not in repr(check)
+    assert "do-not-store" not in repr(check)
