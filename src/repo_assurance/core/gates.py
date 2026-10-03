@@ -135,7 +135,7 @@ def _required_checks(
         requirements.values(),
         key=lambda item: (
             str(item["context"]),
-            -1 if item["app_id"] is None else int(item["app_id"]),
+            -1 if item["app_id"] is None else item["app_id"],
         ),
     )
     return ordered, policy_complete, permission_limited
@@ -148,32 +148,21 @@ def required_check_names(
     return {str(item["context"]) for item in requirements}
 
 
-def resolve_required_gate_mapping(
-    governance: Sequence[Mapping[str, Any]],
+def _workflow_run_index(
     history: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
-    requirements, policy_complete, permission_limited = _required_checks(governance)
-    checks = _by_id(governance, "ev_github_checks")
+) -> tuple[dict[int, list[dict[str, Any]]], bool]:
+    index: dict[int, list[dict[str, Any]]] = {}
+    permission_limited = False
 
-    if checks is None or not _access_available(checks):
-        check_runs: list[Mapping[str, Any]] = []
-        checks_available = False
-        if checks is not None:
-            permission_limited = permission_limited or _permission_limited(checks)
-    else:
-        observation = _observation(checks) or {}
-        raw = observation.get("check_runs")
-        check_runs = [
-            item for item in raw if isinstance(item, Mapping)
-        ] if isinstance(raw, list) else []
-        checks_available = isinstance(raw, list)
-
-    run_to_workflows: dict[int, list[dict[str, Any]]] = {}
     for item in history:
         observation = _observation(item)
-        if not observation or observation.get("access_state") not in {"AVAILABLE", "PARTIAL"}:
+        if not observation or observation.get("access_state") not in {
+            "AVAILABLE",
+            "PARTIAL",
+        }:
             permission_limited = permission_limited or _permission_limited(item)
             continue
+
         workflow_id = observation.get("workflow_id")
         if workflow_id is None:
             continue
@@ -187,110 +176,177 @@ def resolve_required_gate_mapping(
         runs = observation.get("runs")
         if not isinstance(runs, list):
             continue
+
         for run in runs:
             if not isinstance(run, Mapping) or not isinstance(run.get("id"), int):
                 continue
             run_id = int(run["id"])
-            run_to_workflows.setdefault(run_id, []).append({
+            index.setdefault(run_id, []).append({
                 "workflow_id": str(workflow_id),
-                "workflow_name": str(workflow_name) if workflow_name is not None else None,
+                "workflow_name": (
+                    str(workflow_name) if workflow_name is not None else None
+                ),
                 "workflow_path": workflow_path,
             })
+
+    return index, permission_limited
+
+
+def _matching_check_runs(
+    requirement: Mapping[str, Any],
+    check_runs: Sequence[Mapping[str, Any]],
+    *,
+    checks_available: bool,
+) -> tuple[list[Mapping[str, Any]], dict[str, Any] | None]:
+    context = str(requirement["context"])
+    app_id = requirement.get("app_id")
+    matching_name = [
+        item for item in check_runs if item.get("name") == context
+    ]
+
+    if app_id is not None:
+        matching = [
+            item
+            for item in matching_name
+            if _normalize_app_id(item.get("app_id")) == app_id
+        ]
+        if matching_name and not matching:
+            return [], {
+                "context": context,
+                "app_id": app_id,
+                "reason": "required_check_not_produced_by_expected_app",
+            }
+    else:
+        matching = matching_name
+
+    if matching:
+        return matching, None
+
+    return [], {
+        "context": context,
+        "app_id": app_id,
+        "reason": (
+            "required_check_runs_unavailable"
+            if not checks_available
+            else "required_check_not_observed"
+        ),
+    }
+
+
+def _resolve_requirement(
+    requirement: Mapping[str, Any],
+    check_runs: Sequence[Mapping[str, Any]],
+    *,
+    checks_available: bool,
+    run_to_workflows: Mapping[int, Sequence[Mapping[str, Any]]],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    context = str(requirement["context"])
+    app_id = requirement.get("app_id")
+    matching, unresolved = _matching_check_runs(
+        requirement,
+        check_runs,
+        checks_available=checks_available,
+    )
+    if unresolved is not None:
+        return None, unresolved
+
+    workflow_matches: dict[str, dict[str, Any]] = {}
+    check_run_ids: set[int] = set()
+    job_ids: set[int] = set()
+    workflow_run_ids: set[int] = set()
+    has_unlinked_check = False
+
+    for check_run in matching:
+        check_id = check_run.get("id")
+        if isinstance(check_id, int):
+            check_run_ids.add(check_id)
+        job_id = check_run.get("job_id")
+        if isinstance(job_id, int):
+            job_ids.add(job_id)
+
+        run_id = check_run.get("workflow_run_id")
+        if not isinstance(run_id, int):
+            has_unlinked_check = True
+            continue
+        workflow_run_ids.add(run_id)
+
+        workflows = run_to_workflows.get(run_id, [])
+        if not workflows:
+            has_unlinked_check = True
+            continue
+        for workflow in workflows:
+            workflow_id = str(workflow["workflow_id"])
+            workflow_matches[workflow_id] = dict(workflow)
+
+    if len(workflow_matches) > 1:
+        return None, {
+            "context": context,
+            "app_id": app_id,
+            "reason": "required_check_maps_to_multiple_workflows",
+            "workflow_ids": sorted(workflow_matches),
+        }
+
+    if not workflow_matches or has_unlinked_check:
+        return None, {
+            "context": context,
+            "app_id": app_id,
+            "reason": "required_check_workflow_link_unresolved",
+        }
+
+    workflow = next(iter(workflow_matches.values()))
+    return {
+        "context": context,
+        "app_id": app_id,
+        "check_run_ids": sorted(check_run_ids),
+        "job_ids": sorted(job_ids),
+        "workflow_run_ids": sorted(workflow_run_ids),
+        "workflow_id": str(workflow["workflow_id"]),
+        "workflow_name": workflow["workflow_name"],
+        "workflow_path": workflow["workflow_path"],
+    }, None
+
+
+def resolve_required_gate_mapping(
+    governance: Sequence[Mapping[str, Any]],
+    history: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    requirements, policy_complete, permission_limited = _required_checks(governance)
+    checks = _by_id(governance, "ev_github_checks")
+
+    check_runs: list[Mapping[str, Any]] = []
+    checks_available = False
+    if checks is not None and _access_available(checks):
+        observation = _observation(checks) or {}
+        raw = observation.get("check_runs")
+        if isinstance(raw, list):
+            check_runs = [
+                item for item in raw if isinstance(item, Mapping)
+            ]
+            checks_available = True
+    elif checks is not None:
+        permission_limited = permission_limited or _permission_limited(checks)
+
+    run_to_workflows, history_permission_limited = _workflow_run_index(history)
+    permission_limited = permission_limited or history_permission_limited
 
     mappings: list[dict[str, Any]] = []
     unresolved: list[dict[str, Any]] = []
     required_workflow_ids: set[str] = set()
 
     for requirement in requirements:
-        context = str(requirement["context"])
-        app_id = requirement["app_id"]
-        matching_name = [
-            item
-            for item in check_runs
-            if item.get("name") == context
-        ]
-        if app_id is not None:
-            matching = [
-                item
-                for item in matching_name
-                if _normalize_app_id(item.get("app_id")) == app_id
-            ]
-            if matching_name and not matching:
-                unresolved.append({
-                    "context": context,
-                    "app_id": app_id,
-                    "reason": "required_check_not_produced_by_expected_app",
-                })
-                continue
-        else:
-            matching = matching_name
-
-        if not matching:
-            unresolved.append({
-                "context": context,
-                "app_id": app_id,
-                "reason": (
-                    "required_check_runs_unavailable"
-                    if not checks_available
-                    else "required_check_not_observed"
-                ),
-            })
+        mapping, problem = _resolve_requirement(
+            requirement,
+            check_runs,
+            checks_available=checks_available,
+            run_to_workflows=run_to_workflows,
+        )
+        if problem is not None:
+            unresolved.append(problem)
             continue
-
-        workflow_matches: dict[str, dict[str, Any]] = {}
-        check_run_ids: set[int] = set()
-        job_ids: set[int] = set()
-        workflow_run_ids: set[int] = set()
-        unlinked = False
-
-        for check_run in matching:
-            check_id = check_run.get("id")
-            if isinstance(check_id, int):
-                check_run_ids.add(check_id)
-            job_id = check_run.get("job_id")
-            if isinstance(job_id, int):
-                job_ids.add(job_id)
-            run_id = check_run.get("workflow_run_id")
-            if not isinstance(run_id, int):
-                unlinked = True
-                continue
-            workflow_run_ids.add(run_id)
-            matches = run_to_workflows.get(run_id, [])
-            if not matches:
-                unlinked = True
-                continue
-            for workflow in matches:
-                workflow_matches[str(workflow["workflow_id"])] = workflow
-
-        if len(workflow_matches) > 1:
-            unresolved.append({
-                "context": context,
-                "app_id": app_id,
-                "reason": "required_check_maps_to_multiple_workflows",
-                "workflow_ids": sorted(workflow_matches),
-            })
+        if mapping is None:
             continue
-        if not workflow_matches or unlinked:
-            unresolved.append({
-                "context": context,
-                "app_id": app_id,
-                "reason": "required_check_workflow_link_unresolved",
-            })
-            continue
-
-        workflow = next(iter(workflow_matches.values()))
-        workflow_id = str(workflow["workflow_id"])
-        required_workflow_ids.add(workflow_id)
-        mappings.append({
-            "context": context,
-            "app_id": app_id,
-            "check_run_ids": sorted(check_run_ids),
-            "job_ids": sorted(job_ids),
-            "workflow_run_ids": sorted(workflow_run_ids),
-            "workflow_id": workflow_id,
-            "workflow_name": workflow["workflow_name"],
-            "workflow_path": workflow["workflow_path"],
-        })
+        mappings.append(mapping)
+        required_workflow_ids.add(str(mapping["workflow_id"]))
 
     complete = bool(
         policy_complete
