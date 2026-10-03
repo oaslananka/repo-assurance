@@ -35,17 +35,22 @@ def _result(
     control_id: str,
     state: str,
     subject: Mapping[str, Any],
-    evidence_id: str,
+    evidence_id: str | Sequence[str],
     *,
     reason: str | None = None,
     candidate: str | None = None,
 ) -> dict[str, Any]:
+    evidence_ids = (
+        [evidence_id]
+        if isinstance(evidence_id, str)
+        else sorted({str(item) for item in evidence_id})
+    )
     item: dict[str, Any] = {
         "schema_version": "control-result/v1",
         "control_id": control_id,
         "state": state,
         "subject": dict(subject),
-        "evidence_ids": [evidence_id],
+        "evidence_ids": evidence_ids,
         "candidate_finding_ids": [candidate] if candidate else [],
         "evaluated_at": _now(),
     }
@@ -161,6 +166,8 @@ def _evaluate_one(
     item: Mapping[str, Any],
     *,
     required_workflow_ids: set[str],
+    required_mapping_complete: bool,
+    required_gate_evidence_id: str | None,
     expected_blocking_workflow_ids: set[str] | None,
     now: datetime,
     stale_after_days: int,
@@ -173,6 +180,9 @@ def _evaluate_one(
     if not isinstance(subject, Mapping):
         subject = {"type": "github_workflow", "identifier": _workflow_id(item)}
     evidence_id = str(item.get("id", "unknown"))
+    gate_evidence_ids = [evidence_id]
+    if required_gate_evidence_id:
+        gate_evidence_ids.append(required_gate_evidence_id)
     workflow_id = _workflow_id(item)
     runs = _runs(item)
     expected_execution = _expected_execution(item)
@@ -246,44 +256,57 @@ def _evaluate_one(
             reason="insufficient_runs_for_flakiness",
         )
 
-    if workflow_id not in required_workflow_ids:
+    if workflow_id in required_workflow_ids:
+        if chronic or recovery_sha:
+            unreliable_gate = _result(
+                "CI-OPS-006", "FINDING", subject, gate_evidence_ids,
+                reason=f"required_gate_unreliable:{workflow_id}",
+                candidate=f"candidate_CI-OPS-006_{workflow_id}_unreliable_gate",
+            )
+        else:
+            unreliable_gate = _result(
+                "CI-OPS-006", "PASS", subject, gate_evidence_ids,
+            )
+    elif not required_mapping_complete:
         unreliable_gate = _result(
-            "CI-OPS-006", "PASS", subject, evidence_id,
-            reason="workflow_not_required",
-        )
-    elif chronic or recovery_sha:
-        unreliable_gate = _result(
-            "CI-OPS-006", "FINDING", subject, evidence_id,
-            reason=f"required_gate_unreliable:{workflow_id}",
-            candidate=f"candidate_CI-OPS-006_{workflow_id}_unreliable_gate",
+            "CI-OPS-006", "INCONCLUSIVE", subject, gate_evidence_ids,
+            reason="required_gate_mapping_incomplete",
         )
     else:
-        unreliable_gate = _result("CI-OPS-006", "PASS", subject, evidence_id)
+        unreliable_gate = _result(
+            "CI-OPS-006", "PASS", subject, gate_evidence_ids,
+            reason="workflow_not_required",
+        )
 
     if expected_blocking_workflow_ids is None:
         unenforced = _result(
-            "CI-OPS-007", "INCONCLUSIVE", subject, evidence_id,
+            "CI-OPS-007", "INCONCLUSIVE", subject, gate_evidence_ids,
             reason="blocking_expectation_unknown",
         )
     elif workflow_id not in expected_blocking_workflow_ids:
         unenforced = _result(
-            "CI-OPS-007", "PASS", subject, evidence_id,
+            "CI-OPS-007", "PASS", subject, gate_evidence_ids,
             reason="workflow_not_expected_blocking",
         )
     elif workflow_id in required_workflow_ids:
         unenforced = _result(
-            "CI-OPS-007", "PASS", subject, evidence_id,
+            "CI-OPS-007", "PASS", subject, gate_evidence_ids,
             reason="workflow_required",
+        )
+    elif not required_mapping_complete:
+        unenforced = _result(
+            "CI-OPS-007", "INCONCLUSIVE", subject, gate_evidence_ids,
+            reason="required_gate_mapping_incomplete",
         )
     elif stats["meaningful"] >= 5 and stats["success_rate"] >= 0.80 and not chronic:
         unenforced = _result(
-            "CI-OPS-007", "FINDING", subject, evidence_id,
+            "CI-OPS-007", "FINDING", subject, gate_evidence_ids,
             reason=f"healthy_expected_gate_not_required:{workflow_id}",
             candidate=f"candidate_CI-OPS-007_{workflow_id}_unenforced",
         )
     else:
         unenforced = _result(
-            "CI-OPS-007", "INCONCLUSIVE", subject, evidence_id,
+            "CI-OPS-007", "INCONCLUSIVE", subject, gate_evidence_ids,
             reason="expected_gate_not_healthy_enough_to_assess_enforcement",
         )
 
@@ -322,6 +345,8 @@ def evaluate_ci_operational(
     history_evidence: Sequence[Mapping[str, Any]],
     *,
     required_workflow_ids: set[str] | None = None,
+    required_mapping_complete: bool | None = None,
+    required_gate_evidence_id: str | None = None,
     expected_blocking_workflow_ids: set[str] | None = None,
     now: datetime | None = None,
     stale_after_days: int = 30,
@@ -330,12 +355,19 @@ def evaluate_ci_operational(
         raise ValueError("stale_after_days must be positive")
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     required = set(required_workflow_ids or set())
+    mapping_complete = (
+        required_workflow_ids is not None
+        if required_mapping_complete is None
+        else required_mapping_complete
+    )
     results: list[dict[str, Any]] = []
     for item in history_evidence:
         results.extend(
             _evaluate_one(
                 item,
                 required_workflow_ids=required,
+                required_mapping_complete=mapping_complete,
+                required_gate_evidence_id=required_gate_evidence_id,
                 expected_blocking_workflow_ids=expected_blocking_workflow_ids,
                 now=current,
                 stale_after_days=stale_after_days,
