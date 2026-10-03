@@ -144,6 +144,13 @@ def collect_repository_state(
                 access_state=GitHubAccessState.UNKNOWN_ERROR,
             )
         ]
+    security_and_analysis: dict[str, Any] = {}
+    raw_security = payload.get("security_and_analysis")
+    if isinstance(raw_security, dict):
+        for key, value in sorted(raw_security.items()):
+            if isinstance(value, dict) and value.get("status") is not None:
+                security_and_analysis[str(key)] = str(value["status"])
+
     observation = {
         "access_state": GitHubAccessState.AVAILABLE.value,
         "full_name": payload.get("full_name"),
@@ -155,6 +162,7 @@ def collect_repository_state(
         "allow_merge_commit": payload.get("allow_merge_commit"),
         "allow_rebase_merge": payload.get("allow_rebase_merge"),
         "allow_squash_merge": payload.get("allow_squash_merge"),
+        "security_and_analysis": security_and_analysis,
     }
     return [
         _make_evidence(

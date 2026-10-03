@@ -1,0 +1,90 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "dependencies",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "DEP-001",
+      "title": "Dependency inventory is visible",
+      "domain": "dependencies",
+      "description": "GitHub dependency graph/SBOM inventory is visible and non-empty when applicable.",
+      "evaluator": "github_security.dependency_sbom",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["dependency_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "DEP-002",
+      "title": "Dependabot security updates are enabled",
+      "domain": "dependencies",
+      "description": "Repository security configuration exposes Dependabot security updates as enabled.",
+      "evaluator": "github_security.dependabot_updates",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["github_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "DEP-003",
+      "title": "Dependabot alert visibility is evaluated",
+      "domain": "dependencies",
+      "description": "Open Dependabot security advisories are evaluated without treating permission gaps as an empty vulnerability inventory.",
+      "evaluator": "github_security.dependabot_alerts",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["dependency_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}

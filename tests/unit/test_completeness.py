@@ -125,3 +125,19 @@ def test_unknown_error_only_domain_is_unavailable() -> None:
     )
 
     assert coverage["repository"] == "UNAVAILABLE"
+
+def test_dependency_permission_gap_prevents_verified_dependency_domain() -> None:
+    coverage = compute_domain_coverage(
+        audit_plan=plan([
+            ("DEP-001", True),
+            ("DEP-002", True),
+            ("DEP-003", True),
+        ]),
+        control_results=[
+            result("DEP-001", "PASS"),
+            result("DEP-002", "PASS"),
+            result("DEP-003", "UNKNOWN_PERMISSION"),
+        ],
+    )
+
+    assert coverage["dependencies"] == "PARTIAL"

@@ -91,8 +91,8 @@ def test_code_scanning_analyses_preserve_target_and_tool_metadata() -> None:
 
 
 def test_secret_scanning_collector_requests_metadata_only_and_never_persists_secret() -> None:
-    runner = SequenceRunner([cp([[
-        {
+    runner = SequenceRunner([cp(
+        json.dumps({
             "number": 7,
             "state": "open",
             "secret_type": "github_pat",
@@ -100,8 +100,8 @@ def test_secret_scanning_collector_requests_metadata_only_and_never_persists_sec
             "resolution": None,
             "created_at": "2026-10-03T00:00:00Z",
             "updated_at": "2026-10-03T00:00:00Z",
-        }
-    ]])])
+        })
+    )])
 
     item = collect_secret_scanning_alerts(
         "acme/demo",
@@ -110,9 +110,12 @@ def test_secret_scanning_collector_requests_metadata_only_and_never_persists_sec
     )[0]
 
     command = runner.calls[0]
-    assert command[:4] == ["gh", "api", "--paginate", "--slurp"]
+    assert command[:3] == ["gh", "api", "--paginate"]
+    assert "--slurp" not in command
     assert "--jq" in command
-    assert "secret_type" in command[command.index("--jq") + 1]
+    jq = command[command.index("--jq") + 1]
+    assert "secret_type" in jq
+    assert "secret," not in jq
     serialized = json.dumps(item)
     assert '"secret":' not in serialized
     assert item["observation"]["alerts"][0]["secret_type"] == "github_pat"

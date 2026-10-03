@@ -184,3 +184,30 @@ def test_runner_deprecation_becomes_canonical_candidate() -> None:
         evidence=[evidence()],
     )
     assert candidates[0]["type"] == "DEPRECATION_RISK"
+
+def test_dependabot_advisory_gets_stable_vulnerability_candidate() -> None:
+    subject = {
+        "type": "dependency",
+        "identifier": "GHSA-1234-5678-9999",
+        "qualifiers": {"package": "urllib3"},
+    }
+    dependency_evidence = evidence("ev_dep")
+    dependency_evidence["kind"] = "dependency_state"
+    dependency_evidence["subject"] = {
+        "type": "repository",
+        "identifier": "acme/demo",
+    }
+
+    candidates = correlate(
+        control_results=[result(
+            "DEP-003",
+            subject=subject,
+            evidence_ids=["ev_dep"],
+            reason="open_dependabot_alert:8",
+        )],
+        evidence=[dependency_evidence],
+    )
+
+    assert candidates[0]["type"] == "DEPENDENCY_VULNERABILITY"
+    assert candidates[0]["root_discriminator"] == "dependency-advisory"
+    assert candidates[0]["subject"]["identifier"] == "GHSA-1234-5678-9999"

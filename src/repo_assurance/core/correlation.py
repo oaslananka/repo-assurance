@@ -102,6 +102,14 @@ _RULES: tuple[CorrelationRule, ...] = (
         "remote-deleted-local-unique-work",
     ),
     CorrelationRule(
+        "CORR-DEPENDENCY-VULNERABILITY",
+        "DEP-003",
+        "DEPENDENCY_VULNERABILITY",
+        "MEDIUM",
+        "HIGH",
+        "dependency-advisory",
+    ),
+    CorrelationRule(
         "CORR-DIRTY-WORKTREE",
         "HYGIENE-005",
         "PRESERVATION_RISK",
