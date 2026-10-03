@@ -123,11 +123,35 @@ def test_finding_with_missing_evidence_is_rejected() -> None:
         )
 
 
-def test_unmapped_finding_control_is_not_invented() -> None:
-    assert correlate(
-        control_results=[result("GH-GOV-001")],
+def test_unmapped_material_finding_gets_generic_candidate() -> None:
+    candidates = correlate(
+        control_results=[result(
+            "GH-GOV-001",
+            reason="default_branch_governance_absent",
+        )],
         evidence=[evidence()],
-    ) == []
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate["control_id"] == "GH-GOV-001"
+    assert candidate["type"] == "CONTROL_FINDING"
+    assert candidate["proposed_severity"] == "MEDIUM"
+    assert candidate["proposed_confidence"] == "HIGH"
+    assert candidate["evidence_ids"] == ["ev_1"]
+    validate_document("candidate-finding.v1", candidate)
+
+
+def test_unmapped_material_finding_with_missing_evidence_is_rejected() -> None:
+    with pytest.raises(CorrelationError, match="missing evidence"):
+        correlate(
+            control_results=[result(
+                "GH-GOV-001",
+                evidence_ids=["ev_missing"],
+                reason="default_branch_governance_absent",
+            )],
+            evidence=[evidence("ev_present")],
+        )
 
 
 def test_chronic_optional_workflow_becomes_canonical_candidate() -> None:

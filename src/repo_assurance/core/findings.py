@@ -195,12 +195,17 @@ def materialize_findings(
         template = _TEMPLATES.get(finding_type) or _fallback_template(group)
         fingerprint = str(group["fingerprint"])
         short_hash = fingerprint.removeprefix("sha256:")[:8]
+        control_ids = sorted({str(item) for item in group.get("control_ids", [])})
+        title = template["title"]
+        if finding_type == "CONTROL_FINDING" and control_ids:
+            title = f"{control_ids[0]} reported a material finding"
+
         finding = {
             "schema_version": "finding/v1",
             "id": f"{template['prefix']}-{short_hash}",
             "fingerprint": fingerprint,
-            "control_ids": sorted({str(item) for item in group.get("control_ids", [])}),
-            "title": template["title"],
+            "control_ids": control_ids,
+            "title": title,
             "domain": template["domain"],
             "type": finding_type,
             "output_class": template["output_class"],
