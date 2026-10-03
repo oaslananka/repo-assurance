@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import subprocess
-import sys
+import importlib.util
 from pathlib import Path
 
 
@@ -78,13 +77,14 @@ def test_root_skill_is_thin_compatibility_wrapper() -> None:
 
 
 def test_agent_asset_sync_check_passes() -> None:
-    result = subprocess.run(
-        [sys.executable, "scripts/sync_agent_assets.py", "--check"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
+    spec = importlib.util.spec_from_file_location(
+        "sync_agent_assets",
+        ROOT / "scripts" / "sync_agent_assets.py",
     )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
 
-    assert result.returncode == 0, result.stderr or result.stdout
+    assert module.drifted_assets() == []
 
