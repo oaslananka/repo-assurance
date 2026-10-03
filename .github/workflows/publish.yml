@@ -87,7 +87,7 @@ jobs:
           VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
         run: |
           mkdir -p dist/release
-          gh run download "$VALIDATION_RUN_ID"             --name "repo-assurance-release-${EXPECTED_TAG}"             --dir dist/release
+          gh run download "$VALIDATION_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "repo-assurance-release-${EXPECTED_TAG}" --dir dist/release
 
       - name: Verify checksums and manifest provenance
         env:

@@ -103,6 +103,7 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "contents: write" in workflow
     assert "id-token: write" in workflow
     assert "gh run download" in workflow
+    assert '--repo "$GITHUB_REPOSITORY"' in workflow
     assert "release-manifest.json" in workflow
     assert "sha256sum --check SHA256SUMS" in workflow
     assert "python scripts/build_release.py" not in workflow
