@@ -63,3 +63,30 @@ GitHub security/dependency controls use live GitHub API evidence and preserve pe
 - Dependency graph/SBOM evidence records inventory metadata/counts rather than reproducing the full SBOM.
 - UNKNOWN_PERMISSION, entitlement gaps, malformed responses, and unavailable surfaces remain explicit and prevent a verified-domain claim.
 - Dependabot findings use stable advisory subjects such as GHSA-* where available so later provider adapters can correlate equivalent vulnerability evidence.
+
+## External provider state
+
+External assurance providers are modeled separately from their visible GitHub check executions.
+
+A provider check proving `success` does not establish that:
+
+- the provider subscription or entitlement is known;
+- the provider scanned the intended scope;
+- its issue/alert inventory is visible;
+- the inventory is empty;
+- the check is required for merge;
+- the provider remains current against a time-sensitive baseline.
+
+`provider-state/v1` records provider identity, discovery source, known capabilities, entitlement visibility, exact-target execution, coverage/scope, inventory visibility, enforcement, evidence gaps, and baseline requirements.
+
+Initial adapters:
+
+- `sonarqube-cloud/v1`
+- `socket/v1`
+- `generic-github-check/v1` for unknown check providers
+
+The generic adapter never invents capabilities. Unknown entitlement or inventory visibility remains explicit.
+
+Sensitive provider URLs are not stored wholesale. GitHub check normalization retains only provider-relevant host/path and an allowlisted subset of query parameters when needed for grounded scope extraction.
+
+Provider dependency advisories that carry a stable upstream advisory identity such as a GHSA are correlated with GitHub-native dependency findings so the same advisory can deduplicate across evidence sources.

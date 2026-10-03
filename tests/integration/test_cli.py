@@ -69,7 +69,7 @@ def test_plan_outputs_schema_valid_plan_and_accounts_for_catalog(tmp_path: Path,
     plan = json.loads(capsys.readouterr().out)
     validate_document("audit-plan.v1", plan)
     assert plan["repository"]["full_name"] == "acme/demo"
-    assert len(plan["controls"]) == 35
+    assert len(plan["controls"]) == 38
     assert any(item["control_id"] == "CI-OPS-003" for item in plan["controls"])
 
 

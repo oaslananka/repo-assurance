@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "provider-state/v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider",
+    "discovery",
+    "capabilities",
+    "entitlement",
+    "execution",
+    "coverage",
+    "inventory",
+    "enforcement",
+    "evidence_gaps"
+  ],
+  "properties": {
+    "schema_version": {"const": "provider-state/v1"},
+    "provider": {
+      "type": "object",
+      "required": ["id", "display_name", "adapter_id", "known_adapter"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "display_name": {"type": "string", "minLength": 1},
+        "adapter_id": {"type": "string", "minLength": 1},
+        "known_adapter": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "discovery": {
+      "type": "object",
+      "required": ["mechanism", "check_run_id", "app_id", "app_slug"],
+      "properties": {
+        "mechanism": {"const": "github_check_run"},
+        "check_run_id": {"type": ["integer", "null"]},
+        "app_id": {"type": ["integer", "null"]},
+        "app_slug": {"type": "string"},
+        "source_evidence_id": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "entitlement": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "enum": ["VERIFIED", "UNKNOWN", "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "required": ["observed", "check_name", "status", "conclusion", "started_at", "completed_at"],
+      "properties": {
+        "observed": {"type": "boolean"},
+        "check_name": {"type": "string"},
+        "status": {"type": ["string", "null"]},
+        "conclusion": {"type": ["string", "null"]},
+        "started_at": {"type": ["string", "null"]},
+        "completed_at": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["target_commit_sha", "target_binding", "scan_scope", "scope"],
+      "properties": {
+        "target_commit_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+        "target_binding": {"enum": ["ATTACHED", "UNKNOWN"]},
+        "scan_scope": {"enum": ["OBSERVED", "UNKNOWN"]},
+        "scope": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "inventory": {
+      "type": "object",
+      "required": ["access_state", "reason", "items"],
+      "properties": {
+        "access_state": {
+          "enum": ["AVAILABLE", "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR"]
+        },
+        "reason": {"type": ["string", "null"]},
+        "items": {
+          "type": "array",
+          "items": {"type": "object"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "enforcement": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": {"enum": ["REQUIRED", "NOT_REQUIRED", "UNKNOWN"]},
+        "contexts": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence_gaps": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "current_baseline_requirements": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -141,11 +141,20 @@ def _required_checks(
     return ordered, policy_complete, permission_limited
 
 
+def required_check_requirements(
+    governance: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    requirements, _, _ = _required_checks(governance)
+    return [dict(item) for item in requirements]
+
+
 def required_check_names(
     governance: Sequence[Mapping[str, Any]],
 ) -> set[str]:
-    requirements, _, _ = _required_checks(governance)
-    return {str(item["context"]) for item in requirements}
+    return {
+        str(item["context"])
+        for item in required_check_requirements(governance)
+    }
 
 
 def _workflow_run_index(

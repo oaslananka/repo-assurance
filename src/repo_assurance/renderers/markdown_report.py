@@ -37,6 +37,35 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     for domain, state in sorted(dict(report.get("coverage", {})).items()):
         lines.append(f"| {domain} | {state} |")
 
+    lines.extend(["", "## External Providers", ""])
+    providers = report.get("providers", [])
+    if not providers:
+        lines.append("No external provider state was recorded for this audit.")
+    else:
+        lines.extend([
+            "| Provider | Adapter | Execution | Inventory | Enforcement |",
+            "| --- | --- | --- | --- | --- |",
+        ])
+        for provider in sorted(
+            providers,
+            key=lambda item: str(item.get("provider", {}).get("id", "")),
+        ):
+            identity = provider.get("provider", {})
+            execution = provider.get("execution", {})
+            inventory = provider.get("inventory", {})
+            enforcement = provider.get("enforcement", {})
+            lines.append(
+                "| "
+                + " | ".join([
+                    str(identity.get("display_name", identity.get("id", "unknown"))),
+                    "`" + str(identity.get("adapter_id", "unknown")) + "`",
+                    str(execution.get("conclusion") or execution.get("status") or "unknown"),
+                    str(inventory.get("access_state", "unknown")),
+                    str(enforcement.get("state", "unknown")),
+                ])
+                + " |"
+            )
+
     lines.extend(["", "## Priority Findings", ""])
     findings = sorted(report.get("findings", []), key=_finding_sort_key)
     if not findings:

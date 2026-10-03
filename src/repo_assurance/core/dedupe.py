@@ -30,10 +30,14 @@ def _group_key(candidate: Mapping[str, Any]) -> tuple[object, ...]:
     subject = candidate.get("subject")
     if not isinstance(subject, Mapping):
         subject = {"type": "unknown", "identifier": "unknown"}
+    finding_type = str(candidate.get("type", "UNKNOWN"))
+    normalized = _normalized_subject(subject)
+    if finding_type == "DEPENDENCY_VULNERABILITY":
+        normalized = (normalized[0], normalized[1], ())
     return (
-        str(candidate.get("type", "UNKNOWN")),
+        finding_type,
         str(candidate.get("root_discriminator", "unknown")),
-        *_normalized_subject(subject),
+        *normalized,
     )
 
 
@@ -51,6 +55,11 @@ def deduplicate_candidates(
         first = items[0]
         subject = dict(first.get("subject", {}))
         finding_type = str(first.get("type", "UNKNOWN"))
+        if finding_type == "DEPENDENCY_VULNERABILITY":
+            subject = {
+                "type": str(subject.get("type", "dependency")),
+                "identifier": str(subject.get("identifier", "unknown")),
+            }
         root = str(first.get("root_discriminator", "unknown"))
         family = _FAMILY_BY_TYPE.get(finding_type, finding_type)
         fingerprint = build_finding_fingerprint(
