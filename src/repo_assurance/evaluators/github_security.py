@@ -127,7 +127,7 @@ def _evaluate_alert_surface(
     control_id: str,
     repository_subject: Mapping[str, Any],
     reason_prefix: str,
-    pass_reason: str,
+    empty_alert_reason: str,
     build_finding: Callable[[Mapping[str, Any], Sequence[str]], dict[str, Any]],
     evidence_ids: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
@@ -158,7 +158,7 @@ def _evaluate_alert_surface(
                 "PASS",
                 repository_subject,
                 ids,
-                reason=pass_reason,
+                reason=empty_alert_reason,
             )
         ]
     return [build_finding(alert, ids) for alert in alerts]
@@ -348,7 +348,7 @@ def _evaluate_code_scanning_alerts(
         control_id="GH-SEC-002",
         repository_subject=subject,
         reason_prefix="code_scanning_alert_visibility",
-        pass_reason="code_scanning_alerts_visible:no_open_alerts",
+        empty_alert_reason="code_scanning_alerts_visible:no_open_alerts",
         build_finding=_code_scanning_alert_finding,
     )
 
@@ -431,7 +431,7 @@ def _evaluate_secret_scanning(
         control_id="GH-SEC-003",
         repository_subject=subject,
         reason_prefix="secret_scanning_alert_visibility",
-        pass_reason="secret_scanning_enabled_and_alerts_visible:no_open_alerts",
+        empty_alert_reason="secret_scanning_enabled_and_alerts_visible:no_open_alerts",
         build_finding=_secret_scanning_alert_finding,
         evidence_ids=evidence_ids,
     )
@@ -537,7 +537,7 @@ def _evaluate_dependabot_alerts(
         control_id="DEP-003",
         repository_subject=subject,
         reason_prefix="dependabot_alert_visibility",
-        pass_reason="dependabot_alerts_visible:no_open_alerts",
+        empty_alert_reason="dependabot_alerts_visible:no_open_alerts",
         build_finding=_dependabot_alert_finding,
     )
 
