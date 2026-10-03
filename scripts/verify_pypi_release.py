@@ -107,7 +107,7 @@ def fetch_index_payload(
             last_error = RuntimeError(
                 f"{index} returned retryable HTTP {response.status}"
             )
-        except (OSError, TimeoutError, http.client.HTTPException) as exc:
+        except (OSError, http.client.HTTPException) as exc:
             last_error = exc
         finally:
             connection.close()
