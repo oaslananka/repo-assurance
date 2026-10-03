@@ -27,3 +27,10 @@ def test_plugin_archive_contains_one_self_contained_plugin(tmp_path: Path) -> No
         assert not any("/tests/" in name for name in names)
         manifest = json.loads(archive.read("repo-assurance/plugin.json"))
         assert manifest["name"] == "repo-assurance"
+
+
+def test_plugin_archive_is_deterministic(tmp_path: Path) -> None:
+    first = MODULE.build_archive(tmp_path / "first.zip")
+    second = MODULE.build_archive(tmp_path / "second.zip")
+
+    assert first.read_bytes() == second.read_bytes()

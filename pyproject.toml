@@ -16,6 +16,7 @@ repo-assurance = "repo_assurance.cli:main"
 dev = ["pytest>=8,<10"]
 plugin = ["mcp>=2,<3"]
 lock = ["pip-tools==7.6.1"]
+release = ["build>=1.2,<2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
