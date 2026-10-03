@@ -21,6 +21,23 @@ def _latest_check(checks: list[Mapping[str, Any]]) -> Mapping[str, Any]:
     )
 
 
+def _snapshot_context(
+    github_checks: Mapping[str, Any],
+) -> tuple[str, str]:
+    snapshot = github_checks.get("snapshot")
+    repository = (
+        str(snapshot.get("repository"))
+        if isinstance(snapshot, Mapping) and snapshot.get("repository")
+        else "unknown"
+    )
+    target_sha = (
+        str(snapshot.get("target_commit_sha"))
+        if isinstance(snapshot, Mapping) and snapshot.get("target_commit_sha")
+        else "0" * 40
+    )
+    return repository, target_sha
+
+
 def collect_provider_states(
     github_checks: Mapping[str, Any],
     *,
@@ -48,17 +65,7 @@ def collect_provider_states(
         grouped.setdefault(adapter.provider_id, []).append(raw)
         adapters[adapter.provider_id] = adapter
 
-    snapshot = github_checks.get("snapshot")
-    repository = (
-        str(snapshot.get("repository"))
-        if isinstance(snapshot, Mapping) and snapshot.get("repository")
-        else "unknown"
-    )
-    target_sha = (
-        str(snapshot.get("target_commit_sha"))
-        if isinstance(snapshot, Mapping) and snapshot.get("target_commit_sha")
-        else "0" * 40
-    )
+    repository, target_sha = _snapshot_context(github_checks)
 
     output: list[dict[str, Any]] = []
     for provider_id in sorted(grouped):
@@ -66,7 +73,7 @@ def collect_provider_states(
         adapter = adapters[provider_id]
         latest = _latest_check(checks)
         scope = adapter.scope(latest)
-        check_name = str(latest.get("name") or provider_id)
+        latest_check_name = str(latest.get("name") or provider_id)
 
         if required_checks is None:
             enforcement_state = "UNKNOWN"
@@ -74,12 +81,12 @@ def collect_provider_states(
         else:
             matching: set[str] = set()
             for check in checks:
-                check_name = str(check.get("name") or "")
+                current_check_name = str(check.get("name") or "")
                 check_app_id = check.get("app_id")
                 for requirement in required_checks:
                     context = str(requirement.get("context") or "")
                     required_app_id = requirement.get("app_id")
-                    if check_name != context:
+                    if current_check_name != context:
                         continue
                     if (
                         required_app_id is not None
@@ -119,7 +126,7 @@ def collect_provider_states(
             "entitlement": {"state": "UNKNOWN"},
             "execution": {
                 "observed": True,
-                "check_name": check_name,
+                "check_name": latest_check_name,
                 "status": latest.get("status"),
                 "conclusion": latest.get("conclusion"),
                 "started_at": latest.get("started_at"),
@@ -203,17 +210,7 @@ def collect_provider_discovery(
         else []
     )
 
-    snapshot = github_checks.get("snapshot")
-    repository = (
-        str(snapshot.get("repository"))
-        if isinstance(snapshot, Mapping) and snapshot.get("repository")
-        else "unknown"
-    )
-    target_sha = (
-        str(snapshot.get("target_commit_sha"))
-        if isinstance(snapshot, Mapping) and snapshot.get("target_commit_sha")
-        else "0" * 40
-    )
+    repository, target_sha = _snapshot_context(github_checks)
     permission_limited = access_state in {"UNKNOWN_PERMISSION", "AUTH_FAILED"}
 
     item = {

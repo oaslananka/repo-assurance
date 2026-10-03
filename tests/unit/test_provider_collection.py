@@ -204,3 +204,42 @@ def test_provider_enforcement_respects_pinned_app_identity() -> None:
         "state": "NOT_REQUIRED"
     }
 
+def test_execution_metadata_uses_latest_check_when_provider_has_multiple_checks() -> None:
+    items = collect_provider_states(
+        github_checks([
+            {
+                "id": 30,
+                "name": "Socket Security: Project Report",
+                "status": "completed",
+                "conclusion": "success",
+                "app_id": 156372,
+                "app_slug": "socket-security",
+                "app_name": "Socket Security",
+                "details_host": "socket.dev",
+                "details_path": "/dashboard/org/acme/sbom/latest",
+                "details_query": {},
+                "started_at": "2026-10-03T03:00:00Z",
+                "completed_at": "2026-10-03T03:01:00Z",
+            },
+            {
+                "id": 29,
+                "name": "Socket Security: Pull Request Alerts",
+                "status": "completed",
+                "conclusion": "success",
+                "app_id": 156372,
+                "app_slug": "socket-security",
+                "app_name": "Socket Security",
+                "details_host": "socket.dev",
+                "details_path": "",
+                "details_query": {},
+                "started_at": "2026-10-03T02:58:00Z",
+                "completed_at": "2026-10-03T02:59:00Z",
+            },
+        ]),
+        required_checks=[],
+    )
+
+    execution = items[0]["observation"]["execution"]
+    assert execution["check_name"] == "Socket Security: Project Report"
+    assert execution["completed_at"] == "2026-10-03T03:01:00Z"
+
