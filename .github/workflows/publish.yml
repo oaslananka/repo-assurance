@@ -430,10 +430,26 @@ jobs:
           GH_REPO: ${{ github.repository }}
           EXPECTED_TAG: ${{ inputs.expected_tag }}
         run: |
+          set -euo pipefail
+
           if gh release view "$EXPECTED_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::GitHub Release already exists"
-            exit 1
+            mkdir -p dist/existing-release
+            gh release download "$EXPECTED_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --dir dist/existing-release
+
+            expected_hashes="$(cd dist/release && sha256sum * | sort)"
+            existing_hashes="$(cd dist/existing-release && sha256sum * | sort)"
+            if [[ "$expected_hashes" != "$existing_hashes" ]]; then
+              echo "::error::Existing GitHub Release assets do not match validated artifact set"
+              diff -u <(printf '%s\n' "$expected_hashes") <(printf '%s\n' "$existing_hashes") || true
+              exit 1
+            fi
+
+            echo "Existing GitHub Release matches validated artifact set"
+            exit 0
           fi
+
           gh release create "$EXPECTED_TAG" dist/release/* \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
