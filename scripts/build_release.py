@@ -4,6 +4,7 @@ import argparse
 import copy
 import gzip
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -12,7 +13,6 @@ import shutil
 import tarfile
 # subprocess is limited to validated internal release command vectors.
 import subprocess  # nosec B404
-import sys
 import tomllib
 from pathlib import Path
 from typing import Any, Sequence
@@ -164,15 +164,14 @@ def _normalize_sdist(path: Path, *, source_date_epoch: int) -> None:
 
     temporary = path.with_name(path.name + ".tmp")
     try:
-        with temporary.open("wb") as raw:
-            with gzip.GzipFile(
-                filename="",
-                mode="wb",
-                fileobj=raw,
-                compresslevel=9,
-                mtime=source_date_epoch,
-            ) as compressed:
-                compressed.write(canonical_tar.getvalue())
+        with temporary.open("wb") as raw, gzip.GzipFile(
+            filename="",
+            mode="wb",
+            fileobj=raw,
+            compresslevel=9,
+            mtime=source_date_epoch,
+        ) as compressed:
+            compressed.write(canonical_tar.getvalue())
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
@@ -237,16 +236,67 @@ def _source_date_epoch(root: Path) -> str:
     return value
 
 
-def _assert_success(
-    result: subprocess.CompletedProcess[str],
+def _build_python_distributions(
+    root: Path,
+    output: Path,
     *,
-    label: str,
-) -> None:
-    if result.returncode != 0:
-        stderr = result.stderr.strip()
-        stdout = result.stdout.strip()
-        detail = stderr or stdout or f"exit {result.returncode}"
-        raise ReleaseError(f"{label} failed: {detail}")
+    source_date_epoch: int,
+) -> list[Path]:
+    try:
+        from build import ProjectBuilder
+    except ImportError as exc:
+        raise ReleaseError(
+            "release build requires the 'build' package"
+        ) from exc
+
+    previous_epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    os.environ["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
+    try:
+        builder = ProjectBuilder(str(root))
+        built = [
+            Path(builder.build(distribution, str(output)))
+            for distribution in ("sdist", "wheel")
+        ]
+    except Exception as exc:
+        raise ReleaseError(f"python distribution build failed: {exc}") from exc
+    finally:
+        if previous_epoch is None:
+            os.environ.pop("SOURCE_DATE_EPOCH", None)
+        else:
+            os.environ["SOURCE_DATE_EPOCH"] = previous_epoch
+
+    return built
+
+
+def _load_builder_module(path: Path, *, module_name: str):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ReleaseError(f"unable to load release builder: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _build_plugin_archive(root: Path, output: Path) -> None:
+    module = _load_builder_module(
+        root / "scripts" / "build_plugin.py",
+        module_name="_repo_assurance_release_plugin_builder",
+    )
+    try:
+        module.build_archive(output)
+    except Exception as exc:
+        raise ReleaseError(f"plugin build failed: {exc}") from exc
+
+
+def _build_skill_archive(root: Path, output: Path) -> None:
+    module = _load_builder_module(
+        root / "scripts" / "build_skill.py",
+        module_name="_repo_assurance_release_skill_builder",
+    )
+    try:
+        module.build_archive(output)
+    except Exception as exc:
+        raise ReleaseError(f"skill build failed: {exc}") from exc
 
 
 def build_release(
@@ -268,32 +318,16 @@ def build_release(
 
     version = identity["version"]
     source_date_epoch = int(_source_date_epoch(root))
-    env = os.environ.copy()
-    env["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
 
-    build_result = subprocess.run(  # nosec B603
-        [
-            sys.executable,
-            "-m",
-            "build",
-            "--no-isolation",
-            "--outdir",
-            str(output),
-            str(root),
-        ],
-        cwd=root,
-        text=True,
-        capture_output=True,
-        check=False,
-        env=env,
-        shell=False,
+    python_artifacts = _build_python_distributions(
+        root,
+        output,
+        source_date_epoch=source_date_epoch,
     )
-    _assert_success(build_result, label="python -m build")
-
     python_sdists = sorted(
         path
-        for path in output.glob("*.tar.gz")
-        if path.is_file()
+        for path in python_artifacts
+        if path.name.endswith(".tar.gz")
     )
     for sdist in python_sdists:
         _normalize_sdist(
@@ -302,38 +336,10 @@ def build_release(
         )
 
     plugin = output / f"repo-assurance-plugin-{version}.zip"
-    plugin_result = subprocess.run(  # nosec B603
-        [
-            sys.executable,
-            str(root / "scripts" / "build_plugin.py"),
-            "--output",
-            str(plugin),
-        ],
-        cwd=root,
-        text=True,
-        capture_output=True,
-        check=False,
-        env=env,
-        shell=False,
-    )
-    _assert_success(plugin_result, label="plugin build")
+    _build_plugin_archive(root, plugin)
 
     skill = output / f"repository-assurance-skill-{version}.zip"
-    skill_result = subprocess.run(  # nosec B603
-        [
-            sys.executable,
-            str(root / "scripts" / "build_skill.py"),
-            "--output",
-            str(skill),
-        ],
-        cwd=root,
-        text=True,
-        capture_output=True,
-        check=False,
-        env=env,
-        shell=False,
-    )
-    _assert_success(skill_result, label="skill build")
+    _build_skill_archive(root, skill)
 
     source = output / f"repo-assurance-source-{version}.tar.gz"
     archive_result = subprocess.run(  # nosec B603 B607
@@ -349,22 +355,12 @@ def build_release(
         text=True,
         capture_output=True,
         check=False,
-        env=env,
         shell=False,
     )
     _assert_success(archive_result, label="source archive build")
 
     python_artifacts = sorted(
-        [
-            path
-            for path in output.iterdir()
-            if path.is_file()
-            and (
-                path.suffix == ".whl"
-                or path.name.endswith(".tar.gz")
-                and path != source
-            )
-        ],
+        python_artifacts,
         key=lambda path: path.name,
     )
     artifacts = [*python_artifacts, plugin, skill, source]

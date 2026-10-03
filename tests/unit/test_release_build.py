@@ -141,8 +141,9 @@ def test_release_builder_has_no_generic_subprocess_wrapper() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
 
     assert "def _run(" not in source
+    assert "sys.executable" not in source
     assert "shell=True" not in source
-    assert "shell=False" in source
+    assert source.count("subprocess.run(") == 5
 
 
 def test_sdist_normalization_is_deterministic(tmp_path: Path) -> None:
