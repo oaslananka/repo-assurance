@@ -137,8 +137,9 @@ def test_release_output_path_allows_dist_or_external_directory(tmp_path: Path) -
     external = tmp_path / "external-release"
     assert module.assert_safe_output_path(repo, external) == external.resolve()
 
-def test_release_command_runner_rejects_unallowlisted_executable(tmp_path: Path) -> None:
-    module = load_module()
+def test_release_builder_has_no_generic_subprocess_wrapper() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
 
-    with pytest.raises(module.ReleaseError, match="not allowlisted"):
-        module._run(["sh", "-c", "echo unsafe"], root=tmp_path)
+    assert "def _run(" not in source
+    assert "shell=True" not in source
+    assert "shell=False" in source

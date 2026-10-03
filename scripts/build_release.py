@@ -15,8 +15,6 @@ from typing import Any, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
-_ALLOWED_EXECUTABLES = {"git", sys.executable}
-
 SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
@@ -25,30 +23,6 @@ SEMVER = re.compile(
 
 class ReleaseError(RuntimeError):
     pass
-
-
-def _run(
-    argv: Sequence[str],
-    *,
-    root: Path,
-    env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run an allowlisted internal argv vector without shell interpretation."""
-    command = list(argv)
-    if not command or command[0] not in _ALLOWED_EXECUTABLES:
-        raise ReleaseError(
-            f"release command executable is not allowlisted: {command[:1]!r}"
-        )
-    # shell=False plus the executable allowlist prevents shell-command injection.
-    return subprocess.run(  # nosec B603
-        command,
-        cwd=root,
-        text=True,
-        capture_output=True,
-        check=False,
-        env=env,
-        shell=False,
-    )
 
 
 def release_identity(root: Path) -> dict[str, str]:
@@ -77,7 +51,14 @@ def release_identity(root: Path) -> dict[str, str]:
 
 
 def git_commit(root: Path) -> str:
-    result = _run(["git", "rev-parse", "HEAD"], root=root)
+    result = subprocess.run(  # nosec B603 B607
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+        shell=False,
+    )
     commit = result.stdout.strip()
     if result.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ReleaseError("unable to resolve exact Git commit")
@@ -85,9 +66,13 @@ def git_commit(root: Path) -> str:
 
 
 def assert_clean_worktree(root: Path) -> None:
-    result = _run(
+    result = subprocess.run(  # nosec B603 B607
         ["git", "status", "--porcelain=v1", "--untracked-files=all"],
-        root=root,
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+        shell=False,
     )
     if result.returncode != 0:
         raise ReleaseError("unable to inspect Git worktree state")
@@ -101,7 +86,14 @@ def assert_expected_tag(root: Path, *, expected_tag: str, tag: str) -> None:
             f"expected tag {expected_tag!r} does not match canonical release tag {tag!r}"
         )
 
-    result = _run(["git", "tag", "--points-at", "HEAD"], root=root)
+    result = subprocess.run(  # nosec B603 B607
+        ["git", "tag", "--points-at", "HEAD"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+        shell=False,
+    )
     if result.returncode != 0:
         raise ReleaseError("unable to inspect tags pointing at HEAD")
     tags = {line.strip() for line in result.stdout.splitlines() if line.strip()}
@@ -164,25 +156,30 @@ def assert_safe_output_path(root: Path, output: Path) -> Path:
 
 
 def _source_date_epoch(root: Path) -> str:
-    result = _run(["git", "show", "-s", "--format=%ct", "HEAD"], root=root)
+    result = subprocess.run(  # nosec B603 B607
+        ["git", "show", "-s", "--format=%ct", "HEAD"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+        shell=False,
+    )
     value = result.stdout.strip()
     if result.returncode != 0 or not value.isdigit():
         raise ReleaseError("unable to resolve commit timestamp")
     return value
 
 
-def _run_checked(
-    argv: Sequence[str],
+def _assert_success(
+    result: subprocess.CompletedProcess[str],
     *,
-    root: Path,
-    env: dict[str, str] | None = None,
+    label: str,
 ) -> None:
-    result = _run(argv, root=root, env=env)
     if result.returncode != 0:
         stderr = result.stderr.strip()
         stdout = result.stdout.strip()
         detail = stderr or stdout or f"exit {result.returncode}"
-        raise ReleaseError(f"command failed: {' '.join(argv)}: {detail}")
+        raise ReleaseError(f"{label} failed: {detail}")
 
 
 def build_release(
@@ -206,7 +203,7 @@ def build_release(
     env = os.environ.copy()
     env["SOURCE_DATE_EPOCH"] = _source_date_epoch(root)
 
-    _run_checked(
+    build_result = subprocess.run(  # nosec B603
         [
             sys.executable,
             "-m",
@@ -216,36 +213,51 @@ def build_release(
             str(output),
             str(root),
         ],
-        root=root,
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
         env=env,
+        shell=False,
     )
+    _assert_success(build_result, label="python -m build")
 
     plugin = output / f"repo-assurance-plugin-{version}.zip"
-    _run_checked(
+    plugin_result = subprocess.run(  # nosec B603
         [
             sys.executable,
             str(root / "scripts" / "build_plugin.py"),
             "--output",
             str(plugin),
         ],
-        root=root,
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
         env=env,
+        shell=False,
     )
+    _assert_success(plugin_result, label="plugin build")
 
     skill = output / f"repository-assurance-skill-{version}.zip"
-    _run_checked(
+    skill_result = subprocess.run(  # nosec B603
         [
             sys.executable,
             str(root / "scripts" / "build_skill.py"),
             "--output",
             str(skill),
         ],
-        root=root,
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
         env=env,
+        shell=False,
     )
+    _assert_success(skill_result, label="skill build")
 
     source = output / f"repo-assurance-source-{version}.tar.gz"
-    _run_checked(
+    archive_result = subprocess.run(  # nosec B603 B607
         [
             "git",
             "archive",
@@ -254,9 +266,14 @@ def build_release(
             f"--output={source}",
             "HEAD",
         ],
-        root=root,
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
         env=env,
+        shell=False,
     )
+    _assert_success(archive_result, label="source archive build")
 
     python_artifacts = sorted(
         [
