@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_tag:
-        description: Exact existing release tag to publish (for example v0.2.0)
+        description: Exact existing release tag to publish (for example v0.2.1)
         required: true
         type: string
       validation_run_id:
@@ -222,25 +222,41 @@ jobs:
             --only-binary=:all: --require-hashes -r requirements/ci.lock
           WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
           test -n "$WHEEL"
-          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
+          SMOKE_VENV="$RUNNER_TEMP/repo-assurance-wheel-smoke"
+          rm -rf "$SMOKE_VENV"
+          python -m venv --system-site-packages "$SMOKE_VENV"
+          "$SMOKE_VENV/bin/python" -m pip install --disable-pip-version-check --no-deps "$WHEEL"
+          VERSION="$VERSION" "$SMOKE_VENV/bin/python" - <<'PY'
           import importlib.metadata
           import os
+          import sys
+          from pathlib import Path
 
+          import repo_assurance
           from repo_assurance.cli import build_parser
+          from repo_assurance.core.catalog import load_catalog
+          from repo_assurance.core.schema import load_schema
+
+          package_path = Path(repo_assurance.__file__).resolve()
+          environment_root = Path(sys.prefix).resolve()
+          if environment_root not in package_path.parents:
+              raise SystemExit(
+                  f"wheel was not imported from smoke venv: {package_path}"
+              )
 
           actual = importlib.metadata.version("repo-assurance")
           expected = os.environ["VERSION"]
           if actual != expected:
               raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
 
-          parser = build_parser()
-          try:
-              parser.parse_args(["--help"])
-          except SystemExit as exc:
-              if exc.code != 0:
-                  raise
-          else:
-              raise SystemExit("CLI --help did not exit")
+          if not load_catalog():
+              raise SystemExit("installed control catalog is empty")
+
+          if load_schema("control.v1").get("type") != "object":
+              raise SystemExit("installed control schema is invalid")
+
+          if build_parser().prog != "repo-assurance":
+              raise SystemExit("installed CLI parser is invalid")
           PY
 
   verify-testpypi-gate:
@@ -287,25 +303,41 @@ jobs:
             --only-binary=:all: --require-hashes -r requirements/ci.lock
           WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
           test -n "$WHEEL"
-          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
+          SMOKE_VENV="$RUNNER_TEMP/repo-assurance-wheel-smoke"
+          rm -rf "$SMOKE_VENV"
+          python -m venv --system-site-packages "$SMOKE_VENV"
+          "$SMOKE_VENV/bin/python" -m pip install --disable-pip-version-check --no-deps "$WHEEL"
+          VERSION="$VERSION" "$SMOKE_VENV/bin/python" - <<'PY'
           import importlib.metadata
           import os
+          import sys
+          from pathlib import Path
 
+          import repo_assurance
           from repo_assurance.cli import build_parser
+          from repo_assurance.core.catalog import load_catalog
+          from repo_assurance.core.schema import load_schema
+
+          package_path = Path(repo_assurance.__file__).resolve()
+          environment_root = Path(sys.prefix).resolve()
+          if environment_root not in package_path.parents:
+              raise SystemExit(
+                  f"wheel was not imported from smoke venv: {package_path}"
+              )
 
           actual = importlib.metadata.version("repo-assurance")
           expected = os.environ["VERSION"]
           if actual != expected:
               raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
 
-          parser = build_parser()
-          try:
-              parser.parse_args(["--help"])
-          except SystemExit as exc:
-              if exc.code != 0:
-                  raise
-          else:
-              raise SystemExit("CLI --help did not exit")
+          if not load_catalog():
+              raise SystemExit("installed control catalog is empty")
+
+          if load_schema("control.v1").get("type") != "object":
+              raise SystemExit("installed control schema is invalid")
+
+          if build_parser().prog != "repo-assurance":
+              raise SystemExit("installed CLI parser is invalid")
           PY
 
   publish-pypi:
@@ -386,25 +418,41 @@ jobs:
             --only-binary=:all: --require-hashes -r requirements/ci.lock
           WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
           test -n "$WHEEL"
-          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
+          SMOKE_VENV="$RUNNER_TEMP/repo-assurance-wheel-smoke"
+          rm -rf "$SMOKE_VENV"
+          python -m venv --system-site-packages "$SMOKE_VENV"
+          "$SMOKE_VENV/bin/python" -m pip install --disable-pip-version-check --no-deps "$WHEEL"
+          VERSION="$VERSION" "$SMOKE_VENV/bin/python" - <<'PY'
           import importlib.metadata
           import os
+          import sys
+          from pathlib import Path
 
+          import repo_assurance
           from repo_assurance.cli import build_parser
+          from repo_assurance.core.catalog import load_catalog
+          from repo_assurance.core.schema import load_schema
+
+          package_path = Path(repo_assurance.__file__).resolve()
+          environment_root = Path(sys.prefix).resolve()
+          if environment_root not in package_path.parents:
+              raise SystemExit(
+                  f"wheel was not imported from smoke venv: {package_path}"
+              )
 
           actual = importlib.metadata.version("repo-assurance")
           expected = os.environ["VERSION"]
           if actual != expected:
               raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
 
-          parser = build_parser()
-          try:
-              parser.parse_args(["--help"])
-          except SystemExit as exc:
-              if exc.code != 0:
-                  raise
-          else:
-              raise SystemExit("CLI --help did not exit")
+          if not load_catalog():
+              raise SystemExit("installed control catalog is empty")
+
+          if load_schema("control.v1").get("type") != "object":
+              raise SystemExit("installed control schema is invalid")
+
+          if build_parser().prog != "repo-assurance":
+              raise SystemExit("installed CLI parser is invalid")
           PY
 
   publish-github-release:
