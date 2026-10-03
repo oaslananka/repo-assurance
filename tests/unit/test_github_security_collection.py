@@ -160,3 +160,43 @@ def test_dependency_sbom_normalizes_inventory_metadata_only() -> None:
         "packages_count": 2,
         "relationships_count": 1,
     }
+
+def test_code_scanning_alerts_normalize_security_metadata() -> None:
+    runner = SequenceRunner([cp([[
+        {
+            "number": 42,
+            "state": "open",
+            "created_at": "2026-10-03T00:00:00Z",
+            "updated_at": "2026-10-03T00:05:00Z",
+            "dismissed_at": None,
+            "dismissed_reason": None,
+            "tool": {"name": "CodeQL", "version": "2.27.1"},
+            "rule": {
+                "id": "py/sql-injection",
+                "name": "SQL query built from user-controlled sources",
+                "security_severity_level": "high",
+            },
+            "most_recent_instance": {
+                "commit_sha": "a" * 40,
+                "ref": "refs/heads/main",
+                "state": "open",
+            },
+        }
+    ]])])
+
+    item = collect_code_scanning_alerts(
+        "acme/demo",
+        "a" * 40,
+        runner=runner,
+    )[0]
+
+    assert runner.calls == [[
+        "gh", "api", "--paginate", "--slurp",
+        "/repos/acme/demo/code-scanning/alerts?state=open&per_page=100",
+    ]]
+    alert = item["observation"]["alerts"][0]
+    assert alert["number"] == 42
+    assert alert["tool"] == {"name": "CodeQL"}
+    assert alert["rule"]["id"] == "py/sql-injection"
+    assert alert["rule"]["security_severity_level"] == "high"
+    assert alert["most_recent_instance"]["commit_sha"] == "a" * 40
