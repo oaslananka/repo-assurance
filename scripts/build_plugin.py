@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_DIR_NAME = "repo-assurance"
+_FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 ROOT_FILES = (
     "plugin.json",
@@ -21,6 +22,13 @@ TREE_PATTERNS = (
     "schemas/*.json",
     "references/*.md",
 )
+
+
+def _zip_info(name: str) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(name, date_time=_FIXED_ZIP_TIME)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o100644 << 16
+    return info
 
 
 def plugin_files() -> list[Path]:
@@ -38,10 +46,13 @@ def build_archive(output: Path) -> Path:
     if missing:
         raise FileNotFoundError(", ".join(str(path) for path in missing))
 
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(output, "w") as archive:
         for path in files:
             relative = path.relative_to(ROOT)
-            archive.write(path, Path(PLUGIN_DIR_NAME) / relative)
+            archive.writestr(
+                _zip_info((Path(PLUGIN_DIR_NAME) / relative).as_posix()),
+                path.read_bytes(),
+            )
     return output
 
 

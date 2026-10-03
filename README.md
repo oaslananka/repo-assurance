@@ -159,3 +159,30 @@ An authenticated live GitHub acceptance path is opt-in so normal CI does not dep
     REPO_ASSURANCE_RUN_LIVE_ACCEPTANCE=1 pytest -q -m live_github tests/acceptance/test_live_github_acceptance.py
 
 The live acceptance test is permission-aware and does not require SonarQube, Socket, or other external provider dashboards to be reachable.
+
+## Release validation and distribution
+
+Official releases use the Python package version in `pyproject.toml` as the canonical
+version. `plugin.json` must match it exactly, and the official plugin/skill artifacts
+are built from the same exact tagged commit.
+
+Release validation is deliberately non-publishing. A `vX.Y.Z` tag (or an explicit
+manual validation of an existing tag) runs `.github/workflows/release.yml`, which
+uses locked dependencies, executes the full validation suite, builds the Python
+wheel/sdist, plugin ZIP, skill ZIP, and source archive, then emits
+`release-manifest.json` plus `SHA256SUMS`.
+
+For a local validation on a clean tagged checkout:
+
+```bash
+python scripts/build_release.py --expected-tag v0.1.1 --output dist/release
+cd dist/release
+sha256sum --check SHA256SUMS
+```
+
+The validation workflow does **not** publish to PyPI, create a GitHub Release, deploy,
+or update external plugin registries. Publication is a separate owner-authorized
+step using the already validated artifact set.
+
+See `references/release-policy.md`, `references/release-checklist.md`, and
+`CHANGELOG.md`.
