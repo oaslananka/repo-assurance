@@ -143,3 +143,87 @@ def test_release_builder_has_no_generic_subprocess_wrapper() -> None:
     assert "def _run(" not in source
     assert "shell=True" not in source
     assert "shell=False" in source
+
+
+def test_sdist_normalization_is_deterministic(tmp_path: Path) -> None:
+    import gzip
+    import io
+    import tarfile
+    import time
+
+    module = load_module()
+
+    def make_sdist(path: Path, *, mtime: float, uid: int, mode: int) -> None:
+        tar_bytes = io.BytesIO()
+        with tarfile.open(fileobj=tar_bytes, mode="w", format=tarfile.PAX_FORMAT) as archive:
+            root = tarfile.TarInfo("repo_assurance-0.1.1")
+            root.type = tarfile.DIRTYPE
+            root.mtime = mtime
+            root.uid = uid
+            root.gid = uid
+            root.uname = "builder"
+            root.gname = "builder"
+            root.mode = 0o700
+            archive.addfile(root)
+
+            payload = b"payload\n"
+            member = tarfile.TarInfo("repo_assurance-0.1.1/module.py")
+            member.size = len(payload)
+            member.mtime = mtime
+            member.uid = uid
+            member.gid = uid
+            member.uname = "builder"
+            member.gname = "builder"
+            member.mode = mode
+            archive.addfile(member, io.BytesIO(payload))
+
+        with path.open("wb") as raw:
+            with gzip.GzipFile(
+                filename=path.name,
+                mode="wb",
+                fileobj=raw,
+                mtime=int(time.time()),
+            ) as compressed:
+                compressed.write(tar_bytes.getvalue())
+
+    first = tmp_path / "first.tar.gz"
+    second = tmp_path / "second.tar.gz"
+    make_sdist(first, mtime=1000.25, uid=1000, mode=0o600)
+    make_sdist(second, mtime=2000.75, uid=501, mode=0o664)
+
+    epoch = 1_700_000_000
+    module._normalize_sdist(first, source_date_epoch=epoch)
+    module._normalize_sdist(second, source_date_epoch=epoch)
+
+    assert first.read_bytes() == second.read_bytes()
+
+    with tarfile.open(first, mode="r:gz") as archive:
+        members = archive.getmembers()
+        assert all(member.mtime == epoch for member in members)
+        assert all(member.uid == 0 and member.gid == 0 for member in members)
+        assert all(member.uname == "" and member.gname == "" for member in members)
+        assert all(member.pax_headers == {} for member in members)
+        file_member = next(member for member in members if member.isfile())
+        assert file_member.mode == 0o644
+        assert archive.extractfile(file_member).read() == b"payload\n"
+
+
+def test_sdist_normalization_rejects_parent_traversal(tmp_path: Path) -> None:
+    import gzip
+    import io
+    import tarfile
+
+    module = load_module()
+    path = tmp_path / "unsafe.tar.gz"
+
+    tar_bytes = io.BytesIO()
+    with tarfile.open(fileobj=tar_bytes, mode="w") as archive:
+        payload = b"bad"
+        member = tarfile.TarInfo("../escape")
+        member.size = len(payload)
+        archive.addfile(member, io.BytesIO(payload))
+
+    path.write_bytes(gzip.compress(tar_bytes.getvalue(), mtime=0))
+
+    with pytest.raises(module.ReleaseError, match="unsafe sdist member path"):
+        module._normalize_sdist(path, source_date_epoch=1_700_000_000)

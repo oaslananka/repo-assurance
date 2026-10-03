@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import copy
+import gzip
 import hashlib
+import io
 import json
 import os
 import re
 import shutil
+import tarfile
 # subprocess is limited to validated internal release command vectors.
 import subprocess  # nosec B404
 import sys
@@ -111,6 +115,69 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _safe_archive_member(name: str) -> bool:
+    member = Path(name)
+    return bool(name) and not member.is_absolute() and ".." not in member.parts
+
+
+def _normalize_sdist(path: Path, *, source_date_epoch: int) -> None:
+    """Rewrite a Python sdist with deterministic tar and gzip metadata."""
+    try:
+        with tarfile.open(path, mode="r:gz") as source:
+            members = source.getmembers()
+            for member in members:
+                if not _safe_archive_member(member.name):
+                    raise ReleaseError(
+                        f"unsafe sdist member path: {member.name!r}"
+                    )
+
+            canonical_tar = io.BytesIO()
+            with tarfile.open(
+                fileobj=canonical_tar,
+                mode="w",
+                format=tarfile.PAX_FORMAT,
+            ) as target:
+                for member in sorted(members, key=lambda item: item.name):
+                    normalized = copy.copy(member)
+                    normalized.uid = 0
+                    normalized.gid = 0
+                    normalized.uname = ""
+                    normalized.gname = ""
+                    normalized.mtime = source_date_epoch
+                    normalized.pax_headers = {}
+
+                    if normalized.isdir():
+                        normalized.mode = 0o755
+                    elif normalized.isfile():
+                        normalized.mode = (
+                            0o755 if member.mode & 0o111 else 0o644
+                        )
+
+                    payload = (
+                        source.extractfile(member)
+                        if member.isfile()
+                        else None
+                    )
+                    target.addfile(normalized, payload)
+    except (OSError, tarfile.TarError) as exc:
+        raise ReleaseError(f"unable to normalize sdist {path.name}: {exc}") from exc
+
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        with temporary.open("wb") as raw:
+            with gzip.GzipFile(
+                filename="",
+                mode="wb",
+                fileobj=raw,
+                compresslevel=9,
+                mtime=source_date_epoch,
+            ) as compressed:
+                compressed.write(canonical_tar.getvalue())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def build_manifest(
     *,
     version: str,
@@ -200,8 +267,9 @@ def build_release(
     output.mkdir(parents=True, exist_ok=True)
 
     version = identity["version"]
+    source_date_epoch = int(_source_date_epoch(root))
     env = os.environ.copy()
-    env["SOURCE_DATE_EPOCH"] = _source_date_epoch(root)
+    env["SOURCE_DATE_EPOCH"] = str(source_date_epoch)
 
     build_result = subprocess.run(  # nosec B603
         [
@@ -221,6 +289,17 @@ def build_release(
         shell=False,
     )
     _assert_success(build_result, label="python -m build")
+
+    python_sdists = sorted(
+        path
+        for path in output.glob("*.tar.gz")
+        if path.is_file()
+    )
+    for sdist in python_sdists:
+        _normalize_sdist(
+            sdist,
+            source_date_epoch=source_date_epoch,
+        )
 
     plugin = output / f"repo-assurance-plugin-{version}.zip"
     plugin_result = subprocess.run(  # nosec B603
