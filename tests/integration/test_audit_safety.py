@@ -53,9 +53,9 @@ def test_full_audit_attempts_only_read_only_external_commands(
     attempted: list[list[str]] = []
     original = ReadOnlyCommandRunner.run
 
-    def recording_run(self, argv, *, cwd=None):
+    def recording_run(self, argv, *, cwd=None, stdin_text=None):
         attempted.append(list(argv))
-        return original(self, argv, cwd=cwd)
+        return original(self, argv, cwd=cwd, stdin_text=stdin_text)
 
     monkeypatch.setattr(ReadOnlyCommandRunner, "run", recording_run)
     output = tmp_path / "audit-output"

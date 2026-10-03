@@ -23,6 +23,7 @@ class ReadOnlyCommandRunner:
         argv: Sequence[str],
         *,
         cwd: Path | None = None,
+        stdin_text: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         command = list(argv)
         self._assert_read_only(command)
@@ -33,6 +34,7 @@ class ReadOnlyCommandRunner:
                 text=True,
                 capture_output=True,
                 check=False,
+                input=stdin_text,
             )
         except FileNotFoundError as exc:
             return subprocess.CompletedProcess(command, 127, "", str(exc))
@@ -45,6 +47,9 @@ class ReadOnlyCommandRunner:
             return
         if argv[0] == "gh":
             self._assert_gh_read_only(argv[1:])
+            return
+        if argv[0] == "actionlint":
+            self._assert_actionlint_read_only(argv[1:])
             return
         raise MutationBlockedError(f"command family is not allowlisted: {argv[0]}")
 
@@ -131,3 +136,33 @@ class ReadOnlyCommandRunner:
             return
 
         raise MutationBlockedError(f"gh subcommand is not allowlisted for audit mode: {' '.join(args[:2])}")
+
+
+    def _assert_actionlint_read_only(self, args: list[str]) -> None:
+        if args == ["-version"]:
+            return
+
+        expected_prefix = [
+            "-no-color",
+            "-shellcheck=",
+            "-pyflakes=",
+            "-format",
+            "{{json .}}",
+            "-stdin-filename",
+        ]
+        if len(args) != 8 or args[:6] != expected_prefix or args[-1] != "-":
+            raise MutationBlockedError(
+                "actionlint audit mode only permits deterministic stdin validation"
+            )
+
+        filename = args[6]
+        path = Path(filename)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or not filename.startswith(".github/workflows/")
+            or path.suffix.lower() not in {".yml", ".yaml"}
+        ):
+            raise MutationBlockedError(
+                "actionlint stdin filename must be a repository workflow path"
+            )

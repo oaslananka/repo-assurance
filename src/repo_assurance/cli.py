@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from repo_assurance.collectors.actionlint import collect_actionlint_evidence
 from repo_assurance.collectors.baseline import (
     load_baseline_evidence,
     match_baseline_request,
@@ -321,6 +322,13 @@ def _audit(
     )
     evidence.extend(workflow_sources)
     if profile.get("github_actions"):
+        actionlint_evidence = collect_actionlint_evidence(
+            repo,
+            repository=full_name,
+            target_commit_sha=target_sha,
+        )
+        evidence.extend(actionlint_evidence)
+
         resolved_baselines = []
         if not no_current_baseline:
             resolved_baselines = _resolve_runner_baselines(
@@ -332,6 +340,7 @@ def _audit(
             evaluate_ci_static(
                 workflow_sources,
                 baseline_evidence=resolved_baselines,
+                specialist_evidence=actionlint_evidence,
             )
         )
 

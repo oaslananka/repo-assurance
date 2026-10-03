@@ -176,10 +176,108 @@ def build_runner_baseline_requests(workflow_evidence: Sequence[Mapping[str, Any]
     ]
 
 
+def _evaluate_actionlint_validity(
+    workflow_evidence: Sequence[Mapping[str, Any]],
+    *,
+    specialist_evidence: Sequence[Mapping[str, Any]] | None,
+    subject: Mapping[str, Any],
+) -> dict[str, Any]:
+    if specialist_evidence is not None:
+        specialists = list(specialist_evidence)
+        specialist_ids = [
+            str(item.get("id")) for item in specialists if item.get("id")
+        ]
+        states: list[str] = []
+        for item in specialists:
+            observation = item.get("observation")
+            if isinstance(observation, Mapping):
+                states.append(
+                    str(observation.get("actionlint_state", "UNKNOWN_ERROR")).upper()
+                )
+
+        if any(state in {"FINDING", "FAIL", "INVALID"} for state in states):
+            return _result(
+                "CI-STATIC-001",
+                "FINDING",
+                subject,
+                specialist_ids,
+                reason="actionlint_validation_failed",
+                candidate="candidate_CI-STATIC-001_workflow_invalid",
+            )
+        if any(state in {"UNKNOWN_ERROR", "ERROR"} for state in states):
+            return _result(
+                "CI-STATIC-001",
+                "UNKNOWN_ERROR",
+                subject,
+                specialist_ids,
+                reason="actionlint_execution_error",
+            )
+        if states and all(state == "PASS" for state in states):
+            return _result(
+                "CI-STATIC-001",
+                "PASS",
+                subject,
+                specialist_ids,
+            )
+        if states and all(state == "UNAVAILABLE" for state in states):
+            return _result(
+                "CI-STATIC-001",
+                "UNAVAILABLE",
+                subject,
+                specialist_ids,
+                reason="actionlint_executable_unavailable",
+            )
+        if states:
+            return _result(
+                "CI-STATIC-001",
+                "INCONCLUSIVE",
+                subject,
+                specialist_ids,
+                reason="actionlint_evidence_partial",
+            )
+        return _result(
+            "CI-STATIC-001",
+            "INCONCLUSIVE",
+            subject,
+            specialist_ids,
+            reason="actionlint_evidence_unavailable",
+        )
+
+    evidence_ids = [
+        str(item.get("id")) for item in workflow_evidence if item.get("id")
+    ]
+    states: list[str] = []
+    for item in workflow_evidence:
+        observation = item.get("observation")
+        if isinstance(observation, Mapping):
+            states.append(
+                str(observation.get("actionlint_state", "UNAVAILABLE")).upper()
+            )
+    if any(state in {"FINDING", "FAIL", "INVALID"} for state in states):
+        return _result(
+            "CI-STATIC-001",
+            "FINDING",
+            subject,
+            evidence_ids,
+            reason="actionlint_validation_failed",
+            candidate="candidate_CI-STATIC-001_workflow_invalid",
+        )
+    if states and all(state == "PASS" for state in states):
+        return _result("CI-STATIC-001", "PASS", subject, evidence_ids)
+    return _result(
+        "CI-STATIC-001",
+        "INCONCLUSIVE",
+        subject,
+        evidence_ids,
+        reason="actionlint_evidence_unavailable",
+    )
+
+
 def evaluate_ci_static(
     workflow_evidence: Sequence[Mapping[str, Any]],
     *,
     baseline_evidence: Sequence[Mapping[str, Any]] | None = None,
+    specialist_evidence: Sequence[Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     items = list(workflow_evidence)
     subject = _subject(items)
@@ -187,24 +285,11 @@ def evaluate_ci_static(
     analyses = _analyses(items)
 
     # CI-STATIC-001: delegate syntax/semantic validity to specialist evidence.
-    actionlint_states = []
-    for item in items:
-        observation = item.get("observation")
-        if isinstance(observation, Mapping):
-            actionlint_states.append(str(observation.get("actionlint_state", "UNAVAILABLE")).upper())
-    if any(state in {"FINDING", "FAIL", "INVALID"} for state in actionlint_states):
-        validity = _result(
-            "CI-STATIC-001", "FINDING", subject, evidence_ids,
-            reason="actionlint_validation_failed",
-            candidate="candidate_CI-STATIC-001_workflow_invalid",
-        )
-    elif actionlint_states and all(state == "PASS" for state in actionlint_states):
-        validity = _result("CI-STATIC-001", "PASS", subject, evidence_ids)
-    else:
-        validity = _result(
-            "CI-STATIC-001", "INCONCLUSIVE", subject, evidence_ids,
-            reason="actionlint_evidence_unavailable",
-        )
+    validity = _evaluate_actionlint_validity(
+        items,
+        specialist_evidence=specialist_evidence,
+        subject=subject,
+    )
 
     permissions = [analysis["permissions"] for _, analysis in analyses]
     if any(p.get("value") == "write-all" for p in permissions):

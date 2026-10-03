@@ -19,9 +19,10 @@
       },
       "evidence_requirements": {
         "minimum_kinds": [
-          "source"
+          "source",
+          "execution"
         ],
-        "minimum_items": 1
+        "minimum_items": 2
       },
       "evaluation": {
         "time_sensitive": false,
