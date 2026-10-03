@@ -108,6 +108,9 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "sha256sum --check SHA256SUMS" in workflow
     assert "python scripts/build_release.py" not in workflow
     assert "gh release create" in workflow
+    assert "gh release download" in workflow
+    assert "dist/existing-release" in workflow
+    assert "existing GitHub Release assets do not match validated artifacts" in workflow
     github_release_step = workflow.split(
         "- name: Create GitHub Release from validated artifacts", 1
     )[1]
