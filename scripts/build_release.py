@@ -6,7 +6,8 @@ import json
 import os
 import re
 import shutil
-import subprocess
+# subprocess is limited to validated internal release command vectors.
+import subprocess  # nosec B404
 import sys
 import tomllib
 from pathlib import Path
@@ -14,6 +15,8 @@ from typing import Any, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
+_ALLOWED_EXECUTABLES = {"git", sys.executable}
+
 SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
@@ -30,9 +33,15 @@ def _run(
     root: Path,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run an internal argv vector without shell interpretation."""
-    return subprocess.run(
-        list(argv),
+    """Run an allowlisted internal argv vector without shell interpretation."""
+    command = list(argv)
+    if not command or command[0] not in _ALLOWED_EXECUTABLES:
+        raise ReleaseError(
+            f"release command executable is not allowlisted: {command[:1]!r}"
+        )
+    # shell=False plus the executable allowlist prevents shell-command injection.
+    return subprocess.run(  # nosec B603
+        command,
         cwd=root,
         text=True,
         capture_output=True,
