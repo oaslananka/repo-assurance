@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_tag:
-        description: Exact existing release tag to validate (for example v0.1.1)
+        description: Exact existing release tag to validate (for example v0.2.0)
         required: true
         type: string
 

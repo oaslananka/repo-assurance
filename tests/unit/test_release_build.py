@@ -26,8 +26,8 @@ def test_release_identity_matches_current_repository() -> None:
     identity = module.release_identity(ROOT)
 
     assert identity["name"] == "repo-assurance"
-    assert identity["version"] == "0.1.1"
-    assert identity["tag"] == "v0.1.1"
+    assert identity["version"] == "0.2.0"
+    assert identity["tag"] == "v0.2.0"
 
 
 def test_release_identity_rejects_plugin_version_drift(tmp_path: Path) -> None:

@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT = ROOT / "pyproject.toml"
 PLUGIN = ROOT / "plugin.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
+PUBLISH_WORKFLOW = ROOT / ".github" / "workflows" / "publish.yml"
+LICENSE = ROOT / "LICENSE"
 POLICY = ROOT / "references" / "release-policy.md"
 CHECKLIST = ROOT / "references" / "release-checklist.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
@@ -75,3 +77,39 @@ def test_release_builder_and_skill_builder_are_present() -> None:
     assert "git_commit" in release_script
     assert "repository-assurance-skill-" in release_script
     assert "repository-assurance/SKILL.md" in skill_script
+
+
+def test_public_distribution_metadata_uses_mit_license() -> None:
+    package = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    license_text = LICENSE.read_text(encoding="utf-8")
+
+    assert package["project"]["license"] == "MIT"
+    assert "LICENSE" in package["project"]["license-files"]
+    assert license_text.startswith("MIT License\n")
+    assert "Permission is hereby granted, free of charge" in license_text
+    assert 'THE SOFTWARE IS PROVIDED "AS IS"' in license_text
+    assert "MIT License" in readme
+
+
+def test_publish_workflow_reuses_validated_artifacts() -> None:
+    workflow = PUBLISH_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:" in workflow
+    assert "validation_run_id" in workflow
+    assert "expected_tag" in workflow
+    assert "target" in workflow
+    assert "actions: read" in workflow
+    assert "contents: write" in workflow
+    assert "id-token: write" in workflow
+    assert "gh run download" in workflow
+    assert "release-manifest.json" in workflow
+    assert "sha256sum --check SHA256SUMS" in workflow
+    assert "python scripts/build_release.py" not in workflow
+    assert "gh release create" in workflow
+    assert (
+        "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33"
+        in workflow
+    )
+    assert "environment:" in workflow
+    assert "name: pypi" in workflow

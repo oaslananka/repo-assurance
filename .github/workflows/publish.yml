@@ -1,0 +1,197 @@
+name: Publish Validated Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_tag:
+        description: Exact existing release tag to publish (for example v0.2.0)
+        required: true
+        type: string
+      validation_run_id:
+        description: Successful Release Validation workflow run ID for this exact tag
+        required: true
+        type: string
+      target:
+        description: Publication target
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - github
+          - pypi
+
+jobs:
+  prepare:
+    name: verify-validated-artifacts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Verify validation run and exact tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+          VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
+        run: |
+          set -euo pipefail
+
+          [[ "$EXPECTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "::error::expected_tag must be an exact SemVer-like vX.Y.Z tag"
+            exit 1
+          }
+          [[ "$VALIDATION_RUN_ID" =~ ^[0-9]+$ ]] || {
+            echo "::error::validation_run_id must be numeric"
+            exit 1
+          }
+
+          tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${EXPECTED_TAG}")"
+          tag_sha="$(jq -r '.object.sha' <<<"$tag_object")"
+          tag_type="$(jq -r '.object.type' <<<"$tag_object")"
+          if [[ "$tag_type" == "tag" ]]; then
+            tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}")"
+            tag_sha="$(jq -r '.object.sha' <<<"$tag_object")"
+            tag_type="$(jq -r '.object.type' <<<"$tag_object")"
+          fi
+          [[ "$tag_type" == "commit" ]] || {
+            echo "::error::release tag must resolve to a commit"
+            exit 1
+          }
+
+          run_object="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VALIDATION_RUN_ID}")"
+          run_path="$(jq -r '.path' <<<"$run_object")"
+          run_conclusion="$(jq -r '.conclusion' <<<"$run_object")"
+          run_head_sha="$(jq -r '.head_sha' <<<"$run_object")"
+
+          [[ "$run_path" == ".github/workflows/release.yml" ]] || {
+            echo "::error::validation_run_id is not a Release Validation workflow run"
+            exit 1
+          }
+          [[ "$run_conclusion" == "success" ]] || {
+            echo "::error::Release Validation run did not succeed"
+            exit 1
+          }
+          [[ "$run_head_sha" == "$tag_sha" ]] || {
+            echo "::error::Release Validation run SHA does not match the requested tag"
+            exit 1
+          }
+
+          echo "TAG_SHA=$tag_sha" >> "$GITHUB_ENV"
+
+      - name: Download validated release artifact set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+          VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
+        run: |
+          mkdir -p dist/release
+          gh run download "$VALIDATION_RUN_ID"             --name "repo-assurance-release-${EXPECTED_TAG}"             --dir dist/release
+
+      - name: Verify checksums and manifest provenance
+        env:
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+          TAG_SHA: ${{ env.TAG_SHA }}
+        run: |
+          cd dist/release
+          sha256sum --check SHA256SUMS
+          cd ../..
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          release = Path("dist/release")
+          manifest = json.loads(
+              (release / "release-manifest.json").read_text(encoding="utf-8")
+          )
+          expected_tag = os.environ["EXPECTED_TAG"]
+          tag_sha = os.environ["TAG_SHA"]
+
+          if manifest.get("tag") != expected_tag:
+              raise SystemExit("release manifest tag does not match publication request")
+          if manifest.get("git_commit") != tag_sha:
+              raise SystemExit("release manifest commit does not match exact release tag")
+          if manifest.get("version") != expected_tag.removeprefix("v"):
+              raise SystemExit("release manifest version does not match release tag")
+
+          artifacts = manifest.get("artifacts", [])
+          if not artifacts:
+              raise SystemExit("release manifest contains no artifacts")
+
+          for item in artifacts:
+              path = release / item["name"]
+              if not path.is_file():
+                  raise SystemExit(f"manifest artifact is missing: {path.name}")
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              if digest != item["sha256"]:
+                  raise SystemExit(f"manifest digest mismatch: {path.name}")
+          PY
+
+      - name: Stage validated publication bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: validated-release-for-publication
+          path: dist/release
+          if-no-files-found: error
+          retention-days: 7
+
+  github-release:
+    name: publish-github-release
+    if: inputs.target == 'github' || inputs.target == 'both'
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated publication bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: validated-release-for-publication
+          path: dist/release
+
+      - name: Create GitHub Release from validated artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          if gh release view "$EXPECTED_TAG" >/dev/null 2>&1; then
+            echo "::error::GitHub Release already exists; use target=pypi to recover a partial publication"
+            exit 1
+          fi
+          gh release create "$EXPECTED_TAG" dist/release/*             --verify-tag             --generate-notes             --title "Repo Assurance ${EXPECTED_TAG}"
+
+  pypi:
+    name: publish-pypi
+    if: inputs.target == 'pypi' || inputs.target == 'both'
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/repo-assurance
+    permissions:
+      contents: read
+      id-token: write # nosemgrep -- GitHub OIDC permission name; no credential value is stored.
+    steps:
+      - name: Download validated publication bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: validated-release-for-publication
+          path: dist/release
+
+      - name: Select Python distributions
+        run: |
+          mkdir -p dist/pypi
+          cp dist/release/repo_assurance-*.whl dist/pypi/
+          cp dist/release/repo_assurance-*.tar.gz dist/pypi/
+          test "$(find dist/pypi -maxdepth 1 -type f | wc -l)" -eq 2
+
+      - name: Publish Python distributions with PyPI Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist/pypi/
