@@ -110,11 +110,28 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "gh release create" in workflow
     github_release_step = workflow.split(
         "- name: Create GitHub Release from validated artifacts", 1
-    )[1].split("\n  pypi:", 1)[0]
+    )[1]
     assert 'GH_REPO: ${{ github.repository }}' in github_release_step
+    assert '--repo "$GITHUB_REPOSITORY"' in github_release_step
     assert (
         "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33"
         in workflow
     )
     assert "environment:" in workflow
+    assert "name: testpypi" in workflow
     assert "name: pypi" in workflow
+    assert "https://test.pypi.org/legacy/" in workflow
+    assert "- testpypi" in workflow
+    assert "- production" in workflow
+    assert "concurrency:" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert workflow.count("attestations: true") == 2
+    assert "scripts/verify_pypi_release.py" in workflow
+    assert workflow.count("--only-binary=:all: --require-hashes -r requirements/ci.lock") == 3
+    assert "--no-index --no-deps" not in workflow
+    assert workflow.count('PYTHONPATH="$WHEEL" VERSION="$VERSION" python') == 3
+    assert workflow.count("from repo_assurance.cli import build_parser") == 3
+    assert workflow.count("repo_assurance-*.whl") >= 5
+    assert "jsonschema>=4.23,<5" not in workflow
+    assert "repo-assurance==$VERSION" not in workflow
+    assert "repo-assurance --help" not in workflow

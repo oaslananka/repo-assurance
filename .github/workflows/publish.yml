@@ -12,14 +12,17 @@ on:
         required: true
         type: string
       target:
-        description: Publication target
+        description: Publication stage
         required: true
-        default: both
+        default: testpypi
         type: choice
         options:
-          - both
-          - github
-          - pypi
+          - testpypi
+          - production
+
+concurrency:
+  group: repo-assurance-publish-${{ inputs.expected_tag }}
+  cancel-in-progress: false
 
 jobs:
   prepare:
@@ -87,7 +90,10 @@ jobs:
           VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
         run: |
           mkdir -p dist/release
-          gh run download "$VALIDATION_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "repo-assurance-release-${EXPECTED_TAG}" --dir dist/release
+          gh run download "$VALIDATION_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "repo-assurance-release-${EXPECTED_TAG}" \
+            --dir dist/release
 
       - name: Verify checksums and manifest provenance
         env:
@@ -139,14 +145,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  github-release:
-    name: publish-github-release
-    if: inputs.target == 'github' || inputs.target == 'both'
+  publish-testpypi:
+    name: publish-testpypi
+    if: inputs.target == 'testpypi'
     needs: prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/repo-assurance
     permissions:
-      contents: write
+      contents: read
+      id-token: write # nosemgrep -- GitHub OIDC permission name; no credential value is stored.
     steps:
       - name: Download validated publication bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -154,22 +164,156 @@ jobs:
           name: validated-release-for-publication
           path: dist/release
 
-      - name: Create GitHub Release from validated artifacts
+      - name: Select Python distributions
+        run: |
+          mkdir -p dist/pypi
+          cp dist/release/repo_assurance-*.whl dist/pypi/
+          cp dist/release/repo_assurance-*.tar.gz dist/pypi/
+          test "$(find dist/pypi -maxdepth 1 -type f | wc -l)" -eq 2
+
+      - name: Publish Python distributions to TestPyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist/pypi/
+          repository-url: https://test.pypi.org/legacy/
+          attestations: true
+
+  verify-testpypi:
+    name: verify-testpypi
+    if: inputs.target == 'testpypi'
+    needs: publish-testpypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out release verification code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.14"
+
+      - name: Download validated publication bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: validated-release-for-publication
+          path: dist/release
+
+      - name: Verify TestPyPI files match validated artifacts
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           EXPECTED_TAG: ${{ inputs.expected_tag }}
         run: |
-          if gh release view "$EXPECTED_TAG" >/dev/null 2>&1; then
-            echo "::error::GitHub Release already exists; use target=pypi to recover a partial publication"
-            exit 1
-          fi
-          gh release create "$EXPECTED_TAG" dist/release/*             --verify-tag             --generate-notes             --title "Repo Assurance ${EXPECTED_TAG}"
+          VERSION="${EXPECTED_TAG#v}"
+          python scripts/verify_pypi_release.py \
+            --index testpypi \
+            --version "$VERSION" \
+            --release-dir dist/release
 
-  pypi:
-    name: publish-pypi
-    if: inputs.target == 'pypi' || inputs.target == 'both'
+      - name: Smoke-test exact TestPyPI-published CLI artifact
+        env:
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          VERSION="${EXPECTED_TAG#v}"
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --require-hashes -r requirements/ci.lock
+          WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
+          test -n "$WHEEL"
+          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
+          import importlib.metadata
+          import os
+
+          from repo_assurance.cli import build_parser
+
+          actual = importlib.metadata.version("repo-assurance")
+          expected = os.environ["VERSION"]
+          if actual != expected:
+              raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
+
+          parser = build_parser()
+          try:
+              parser.parse_args(["--help"])
+          except SystemExit as exc:
+              if exc.code != 0:
+                  raise
+          else:
+              raise SystemExit("CLI --help did not exit")
+          PY
+
+  verify-testpypi-gate:
+    name: verify-testpypi-production-gate
+    if: inputs.target == 'production'
     needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out release verification code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.14"
+
+      - name: Download validated publication bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: validated-release-for-publication
+          path: dist/release
+
+      - name: Require exact validated files on TestPyPI
+        env:
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          VERSION="${EXPECTED_TAG#v}"
+          python scripts/verify_pypi_release.py \
+            --index testpypi \
+            --version "$VERSION" \
+            --release-dir dist/release
+
+      - name: Re-smoke exact staged CLI artifact before production
+        env:
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          VERSION="${EXPECTED_TAG#v}"
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --require-hashes -r requirements/ci.lock
+          WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
+          test -n "$WHEEL"
+          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
+          import importlib.metadata
+          import os
+
+          from repo_assurance.cli import build_parser
+
+          actual = importlib.metadata.version("repo-assurance")
+          expected = os.environ["VERSION"]
+          if actual != expected:
+              raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
+
+          parser = build_parser()
+          try:
+              parser.parse_args(["--help"])
+          except SystemExit as exc:
+              if exc.code != 0:
+                  raise
+          else:
+              raise SystemExit("CLI --help did not exit")
+          PY
+
+  publish-pypi:
+    name: publish-pypi
+    if: inputs.target == 'production'
+    needs:
+      - prepare
+      - verify-testpypi-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
@@ -192,7 +336,106 @@ jobs:
           cp dist/release/repo_assurance-*.tar.gz dist/pypi/
           test "$(find dist/pypi -maxdepth 1 -type f | wc -l)" -eq 2
 
-      - name: Publish Python distributions with PyPI Trusted Publishing
+      - name: Publish Python distributions to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: dist/pypi/
+          attestations: true
+
+  verify-pypi:
+    name: verify-pypi
+    if: inputs.target == 'production'
+    needs: publish-pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out release verification code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.14"
+
+      - name: Download validated publication bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: validated-release-for-publication
+          path: dist/release
+
+      - name: Verify PyPI files match validated artifacts
+        env:
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          VERSION="${EXPECTED_TAG#v}"
+          python scripts/verify_pypi_release.py \
+            --index pypi \
+            --version "$VERSION" \
+            --release-dir dist/release
+
+      - name: Smoke-test exact PyPI-published CLI artifact
+        env:
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          VERSION="${EXPECTED_TAG#v}"
+          python -m pip install --disable-pip-version-check \
+            --only-binary=:all: --require-hashes -r requirements/ci.lock
+          WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
+          test -n "$WHEEL"
+          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
+          import importlib.metadata
+          import os
+
+          from repo_assurance.cli import build_parser
+
+          actual = importlib.metadata.version("repo-assurance")
+          expected = os.environ["VERSION"]
+          if actual != expected:
+              raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
+
+          parser = build_parser()
+          try:
+              parser.parse_args(["--help"])
+          except SystemExit as exc:
+              if exc.code != 0:
+                  raise
+          else:
+              raise SystemExit("CLI --help did not exit")
+          PY
+
+  publish-github-release:
+    name: publish-github-release
+    if: inputs.target == 'production'
+    needs:
+      - prepare
+      - verify-pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated publication bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: validated-release-for-publication
+          path: dist/release
+
+      - name: Create GitHub Release from validated artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          if gh release view "$EXPECTED_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::GitHub Release already exists"
+            exit 1
+          fi
+          gh release create "$EXPECTED_TAG" dist/release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --generate-notes \
+            --title "Repo Assurance ${EXPECTED_TAG}"
