@@ -17,5 +17,15 @@ def test_built_wheel_contains_runtime_catalog_and_schemas(tmp_path: Path) -> Non
     with zipfile.ZipFile(wheel) as archive:
         names = set(archive.namelist())
 
-    assert "repo_assurance/resources/controls/snapshot.v1.json" in names
-    assert "repo_assurance/resources/schemas/control.v1.schema.json" in names
+    assert any(
+        name.endswith(
+            "data/share/repo-assurance/controls/snapshot.v1.json"
+        )
+        for name in names
+    )
+    assert any(
+        name.endswith(
+            "data/share/repo-assurance/schemas/control.v1.schema.json"
+        )
+        for name in names
+    )
