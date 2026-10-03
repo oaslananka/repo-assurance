@@ -430,10 +430,49 @@ jobs:
           GH_REPO: ${{ github.repository }}
           EXPECTED_TAG: ${{ inputs.expected_tag }}
         run: |
+          set -euo pipefail
+
           if gh release view "$EXPECTED_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::GitHub Release already exists"
-            exit 1
+            rm -rf dist/existing-release
+            mkdir -p dist/existing-release
+            gh release download "$EXPECTED_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --dir dist/existing-release
+
+            python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          def file_hashes(root: Path) -> dict[str, str]:
+              return {
+                  str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                  for path in sorted(root.rglob("*"))
+                  if path.is_file()
+              }
+
+          expected = file_hashes(Path("dist/release"))
+          actual = file_hashes(Path("dist/existing-release"))
+
+          if expected != actual:
+              expected_names = set(expected)
+              actual_names = set(actual)
+              missing = sorted(expected_names - actual_names)
+              extra = sorted(actual_names - expected_names)
+              changed = sorted(
+                  name
+                  for name in expected_names & actual_names
+                  if expected[name] != actual[name]
+              )
+              raise SystemExit(
+                  "existing GitHub Release assets do not match validated artifacts: "
+                  f"missing={missing} extra={extra} changed={changed}"
+              )
+
+          print("existing GitHub Release assets match validated artifacts")
+          PY
+            exit 0
           fi
+
           gh release create "$EXPECTED_TAG" dist/release/* \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
