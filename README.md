@@ -22,6 +22,7 @@ Third-party provider adapters (Codecov, SonarQube Cloud, Semgrep, Codacy, Mergif
 - Python 3.12+
 - Git
 - `gh` for GitHub live-state collection (audits degrade explicitly when it is unavailable)
+- `actionlint` for first-class GitHub Actions syntax/semantic validation (CI-STATIC-001 becomes explicit `UNAVAILABLE` when it is not installed)
 
 Development:
 
@@ -114,6 +115,8 @@ Local filesystem access requires a host that can launch the stdio MCP process (f
 ### Immutable source evidence
 
 Repository profile and workflow-source controls read from the audited Git object (`<target SHA>:<path>`), not from the current checkout. Dirty working-tree state remains separate drift evidence and is never relabeled as target-SHA source evidence.
+
+When `actionlint` is installed, CI-STATIC-001 runs it against the exact audited workflow bytes through stdin. The adapter records actionlint version, workflow target, invocation mode, exit state, and normalized diagnostics. It runs in an isolated temporary directory with shellcheck/pyflakes integrations disabled, does not write into the repository, and does not persist raw workflow bytes or diagnostic source snippets. Missing actionlint is reported as `UNAVAILABLE`, never PASS.
 
 For current-sensitive controls, authoritative baseline evidence can be supplied explicitly:
 

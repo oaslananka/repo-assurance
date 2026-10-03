@@ -213,3 +213,57 @@ def test_missing_runner_baseline_is_inconclusive() -> None:
     item = result(results, "CI-STATIC-008")
     assert item["state"] == "INCONCLUSIVE"
     assert item["reason"] == "current_runner_baseline_missing:ubuntu-latest"
+
+
+def actionlint_evidence(state: str) -> dict:
+    return {
+        "schema_version": "evidence/v1",
+        "id": "ev_actionlint_ci",
+        "kind": "execution",
+        "source": {"provider": "actionlint", "mechanism": "stdin", "collector": "actionlint/v1"},
+        "subject": {"type": "github_workflow", "identifier": ".github/workflows/ci.yml"},
+        "observation": {"actionlint_state": state, "tool_version": "1.7.12", "diagnostics": []},
+        "snapshot": {"repository": "acme/demo", "target_commit_sha": "a" * 40},
+        "collected_at": "2026-10-03T00:00:00Z",
+        "visibility": {"completeness": "complete" if state in {"PASS", "FINDING"} else "unknown", "permission_limited": False, "retention_limited": False},
+        "redactions": [],
+    }
+
+
+def test_first_class_actionlint_pass_drives_ci_static_001() -> None:
+    source = workflow_evidence(".github/workflows/ci.yml", "name: CI\non: push\njobs: {}\n")
+    item = result(evaluate_ci_static([source], specialist_evidence=[actionlint_evidence("PASS")]), "CI-STATIC-001")
+    assert item["state"] == "PASS"
+    assert item["evidence_ids"] == [
+        "ev_actionlint_ci",
+        "ev_workflow_.github_workflows_ci.yml",
+    ]
+
+
+def test_first_class_actionlint_finding_drives_ci_static_001() -> None:
+    source = workflow_evidence(".github/workflows/ci.yml", "name: CI\njobs: {}\n")
+    item = result(evaluate_ci_static([source], specialist_evidence=[actionlint_evidence("FINDING")]), "CI-STATIC-001")
+    assert item["state"] == "FINDING"
+    assert item["reason"] == "actionlint_validation_failed"
+
+
+def test_first_class_actionlint_unavailable_is_not_pass() -> None:
+    source = workflow_evidence(".github/workflows/ci.yml", "name: CI\non: push\njobs: {}\n")
+    item = result(evaluate_ci_static([source], specialist_evidence=[actionlint_evidence("UNAVAILABLE")]), "CI-STATIC-001")
+    assert item["state"] == "UNAVAILABLE"
+
+
+def test_first_class_actionlint_unknown_error_propagates() -> None:
+    source = workflow_evidence(
+        ".github/workflows/ci.yml",
+        "name: CI\non: push\njobs: {}\n",
+    )
+    item = result(
+        evaluate_ci_static(
+            [source],
+            specialist_evidence=[actionlint_evidence("UNKNOWN_ERROR")],
+        ),
+        "CI-STATIC-001",
+    )
+    assert item["state"] == "UNKNOWN_ERROR"
+    assert item["reason"] == "actionlint_execution_error"

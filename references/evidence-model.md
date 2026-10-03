@@ -38,3 +38,15 @@ Rules:
 - If one required context maps to multiple workflows, or the check/run/history link is missing, the mapping is incomplete.
 - Incomplete or permission-limited mapping is explicit inference evidence and must not be converted into `workflow_not_required` PASS.
 - Gate-sensitive control results reference both workflow-history evidence and the normalized required-gate mapping evidence.
+
+## Specialist workflow validation
+
+CI-STATIC-001 uses actionlint as first-class execution evidence.
+
+- Audited workflow bytes are read from the exact target Git object, not the checkout.
+- Raw workflow bytes are sent to actionlint through stdin and are not persisted by the adapter.
+- actionlint runs in an isolated temporary working directory so dirty checkout configuration cannot affect the specialist result.
+- shellcheck and pyflakes integrations are disabled for deterministic single-tool provenance.
+- Stored diagnostics keep message/path/line/column/kind metadata but omit source snippets.
+- Missing actionlint is explicit UNAVAILABLE evidence; execution/parsing failures are UNKNOWN_ERROR.
+- CI-STATIC-001 reaches PASS only when every specialist workflow result is PASS.

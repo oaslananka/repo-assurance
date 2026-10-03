@@ -110,3 +110,26 @@ def test_missing_allowlisted_executable_returns_127_instead_of_crashing() -> Non
 
     assert result.returncode == 127
     assert "gh not installed" in result.stderr
+
+
+def test_actionlint_stdin_mode_is_allowlisted() -> None:
+    calls = []
+    def fake_executor(command, **kwargs):
+        calls.append((command, kwargs.get("input")))
+        return subprocess.CompletedProcess(["actionlint"], 0, "[]", "")
+    runner = ReadOnlyCommandRunner(executor=fake_executor)
+    argv = ["actionlint", "-no-color", "-shellcheck=", "-pyflakes=", "-format", "{{json .}}", "-stdin-filename", ".github/workflows/ci.yml", "-"]
+    result = runner.run(argv, stdin_text="name: CI\n")
+    assert result.returncode == 0
+    assert calls == [(argv, "name: CI\n")]
+
+
+@pytest.mark.parametrize("argv", [
+    ["actionlint", "-init-config"],
+    ["actionlint", ".github/workflows/ci.yml"],
+    ["actionlint", "-no-color", "-shellcheck=shellcheck", "-pyflakes=", "-format", "{{json .}}", "-stdin-filename", ".github/workflows/ci.yml", "-"],
+])
+def test_actionlint_mutating_or_nondeterministic_modes_are_blocked(argv: list[str]) -> None:
+    runner = ReadOnlyCommandRunner(executor=lambda *args, **kwargs: None)
+    with pytest.raises(MutationBlockedError):
+        runner.run(argv)
