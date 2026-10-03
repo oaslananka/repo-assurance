@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -48,9 +47,6 @@ def main() -> int:
 
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     command = [
-        sys.executable,
-        "-m",
-        "piptools",
         "compile",
         "--all-build-deps",
         "--all-extras",
@@ -66,9 +62,25 @@ def main() -> int:
     ]
     if args.upgrade:
         command.insert(-1, "--upgrade")
-    env = dict(os.environ)
-    env["CUSTOM_COMPILE_COMMAND"] = "python scripts/update_ci_lock.py"
-    subprocess.run(command, cwd=ROOT, env=env, check=True)
+
+    from piptools.__main__ import cli
+
+    previous_cwd = Path.cwd()
+    previous_compile_command = os.environ.get("CUSTOM_COMPILE_COMMAND")
+    try:
+        os.chdir(ROOT)
+        os.environ["CUSTOM_COMPILE_COMMAND"] = "python scripts/update_ci_lock.py"
+        cli.main(
+            args=command,
+            prog_name="python -m piptools",
+            standalone_mode=False,
+        )
+    finally:
+        os.chdir(previous_cwd)
+        if previous_compile_command is None:
+            os.environ.pop("CUSTOM_COMPILE_COMMAND", None)
+        else:
+            os.environ["CUSTOM_COMPILE_COMMAND"] = previous_compile_command
     return 0
 
 
