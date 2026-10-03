@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
@@ -70,7 +71,12 @@ def test_runner_decodes_command_output_as_utf8_independent_of_host_locale() -> N
 
     def fake_executor(command, **kwargs):
         captured.update(kwargs)
-        return subprocess.CompletedProcess(command, 0, '{"name":"İzmir"}', "")
+        return SimpleNamespace(
+            args=command,
+            returncode=0,
+            stdout='{"name":"İzmir"}',
+            stderr="",
+        )
 
     runner = ReadOnlyCommandRunner(executor=fake_executor)
     result = runner.run(["gh", "api", "/repos/acme/demo"])
