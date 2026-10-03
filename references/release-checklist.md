@@ -19,6 +19,7 @@ Use this checklist for an official `vX.Y.Z` release candidate.
 - [ ] Confirm the Release Validation workflow checks out that exact tag.
 - [ ] Confirm package/plugin version alignment.
 - [ ] Confirm all release validation gates pass.
+- [ ] Confirm the built wheel installs into the smoke environment and loads the packaged control catalog and JSON schemas without source-tree fallback.
 - [ ] Record the successful Release Validation run ID.
 - [ ] Download the GitHub Actions release artifact and verify `SHA256SUMS`.
 - [ ] Confirm `release-manifest.json` records the intended exact commit and artifact hashes.
@@ -35,11 +36,11 @@ Use this checklist for an official `vX.Y.Z` release candidate.
 
 - [ ] Do **not** publish to TestPyPI, PyPI, create a GitHub Release, deploy, or update external plugin registries unless the owner has explicitly authorized that publication step.
 - [ ] Run `Publish Validated Release` with target `testpypi`, the exact tag, and the successful validation run ID.
-- [ ] Confirm TestPyPI filename/digest verification and CLI smoke testing succeed.
+- [ ] Confirm TestPyPI filename/digest verification and installed-wheel runtime verification succeed.
 - [ ] Run `Publish Validated Release` again with target `production`, using the same exact tag and validation run ID.
 - [ ] Confirm the production gate re-verifies the staged TestPyPI bytes before PyPI publication.
 - [ ] Use only the previously validated artifact set; do not rebuild from a different commit.
-- [ ] Confirm PyPI filename/digest verification and production CLI smoke testing succeed before the GitHub Release is created.
+- [ ] Confirm PyPI filename/digest verification and installed-wheel runtime verification succeed before the GitHub Release is created.
 
 ## After an authorized publication
 
