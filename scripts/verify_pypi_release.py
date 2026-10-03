@@ -3,18 +3,17 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Any
 
 
 PROJECT = "repo-assurance"
-INDEX_JSON_URLS = {
-    "pypi": "https://pypi.org/pypi/{project}/{version}/json",
-    "testpypi": "https://test.pypi.org/pypi/{project}/{version}/json",
+INDEX_ENDPOINTS = {
+    "pypi": ("pypi.org", "/pypi/{project}/{version}/json"),
+    "testpypi": ("test.pypi.org", "/pypi/{project}/{version}/json"),
 }
 
 
@@ -79,26 +78,39 @@ def fetch_index_payload(
     attempts: int = 24,
     delay_seconds: float = 5.0,
 ) -> dict[str, Any]:
-    url = INDEX_JSON_URLS[index].format(project=PROJECT, version=version)
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "repo-assurance-release-verifier/1"},
-    )
+    host, path_template = INDEX_ENDPOINTS[index]
+    path = path_template.format(project=PROJECT, version=version)
 
     last_error: Exception | None = None
+    retryable_statuses = {404, 429, 500, 502, 503, 504}
     for attempt in range(1, attempts + 1):
+        connection = http.client.HTTPSConnection(host, timeout=15)
         try:
-            with urllib.request.urlopen(request, timeout=15) as response:
-                payload = json.load(response)
-            if not isinstance(payload, dict):
-                raise ValueError("package index returned a non-object JSON payload")
-            return payload
-        except urllib.error.HTTPError as exc:
+            connection.request(
+                "GET",
+                path,
+                headers={"User-Agent": "repo-assurance-release-verifier/1"},
+            )
+            response = connection.getresponse()
+            body = response.read()
+            if response.status == 200:
+                payload = json.loads(body.decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError(
+                        "package index returned a non-object JSON payload"
+                    )
+                return payload
+            if response.status not in retryable_statuses:
+                raise RuntimeError(
+                    f"{index} returned HTTP {response.status} for {PROJECT}=={version}"
+                )
+            last_error = RuntimeError(
+                f"{index} returned retryable HTTP {response.status}"
+            )
+        except (OSError, TimeoutError, http.client.HTTPException) as exc:
             last_error = exc
-            if exc.code not in {404, 429, 500, 502, 503, 504}:
-                raise
-        except (urllib.error.URLError, TimeoutError) as exc:
-            last_error = exc
+        finally:
+            connection.close()
 
         if attempt != attempts:
             time.sleep(delay_seconds)
@@ -112,7 +124,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify published PyPI/TestPyPI files against validated artifacts."
     )
-    parser.add_argument("--index", choices=sorted(INDEX_JSON_URLS), required=True)
+    parser.add_argument("--index", choices=sorted(INDEX_ENDPOINTS), required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--release-dir", type=Path, required=True)
     return parser.parse_args()
