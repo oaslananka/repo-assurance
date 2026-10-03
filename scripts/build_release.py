@@ -236,6 +236,18 @@ def _source_date_epoch(root: Path) -> str:
     return value
 
 
+def _assert_success(
+    result: subprocess.CompletedProcess[str],
+    *,
+    label: str,
+) -> None:
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        stdout = result.stdout.strip()
+        detail = stderr or stdout or f"exit {result.returncode}"
+        raise ReleaseError(f"{label} failed: {detail}")
+
+
 def _build_python_distributions(
     root: Path,
     output: Path,
