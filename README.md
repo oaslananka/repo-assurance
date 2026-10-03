@@ -126,3 +126,13 @@ repo-assurance audit --repo . --baseline-evidence /path/to/baselines.json
 ```
 
 `baselines.json` is a `baseline-evidence/v1` object or list. Missing or stale current evidence remains `INCONCLUSIVE`; the engine does not substitute model memory.
+
+### Self-audit acceptance
+
+The ordinary test suite includes a deterministic offline acceptance test that drives the canonical CLI against an immutable Git target while the checkout has later and dirty changes. It validates report schemas, material finding propagation, blind spots, Markdown rendering, and repository read-only invariants.
+
+An authenticated live GitHub acceptance path is opt-in so normal CI does not depend on external API/provider availability. Run it with:
+
+    REPO_ASSURANCE_RUN_LIVE_ACCEPTANCE=1 pytest -q -m live_github tests/acceptance/test_live_github_acceptance.py
+
+The live acceptance test is permission-aware and does not require SonarQube, Socket, or other external provider dashboards to be reachable.
