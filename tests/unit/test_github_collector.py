@@ -115,6 +115,20 @@ def test_malformed_success_json_becomes_unknown_error() -> None:
     assert evidence[0]["visibility"]["completeness"] == "unknown"
 
 
+
+def test_missing_success_stdout_becomes_unknown_error() -> None:
+    result = subprocess.CompletedProcess(["gh"], 0, None, "")
+    runner = FakeRunner(result)
+
+    evidence = collect_repository_state("acme/demo", "a" * 40, runner=runner)
+
+    assert evidence[0]["observation"] == {
+        "access_state": "UNKNOWN_ERROR",
+        "error_code": "MISSING_STDOUT",
+    }
+    assert evidence[0]["visibility"]["completeness"] == "unknown"
+
+
 def test_collect_rulesets_preserves_rules_and_bypass_metadata() -> None:
     runner = FakeRunner(
         cp(
