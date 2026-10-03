@@ -103,3 +103,33 @@ def test_actionlint_uses_target_commit_not_checkout(tmp_path: Path) -> None:
     collect_actionlint_evidence(repo, repository="acme/demo", target_commit_sha=sha, runner=runner)
 
     assert runner.calls[1][1] == target
+
+
+def test_actionlint_execution_failure_is_unknown_error(tmp_path: Path) -> None:
+    repo, sha = repo_with_workflow(tmp_path, "name: CI\non: push\njobs: {}\n")
+    runner = FakeRunner(lint=[cp(2, "", "unexpected failure")])
+
+    item = collect_actionlint_evidence(
+        repo,
+        repository="acme/demo",
+        target_commit_sha=sha,
+        runner=runner,
+    )[0]
+
+    assert item["observation"]["actionlint_state"] == "UNKNOWN_ERROR"
+    assert item["observation"]["error_code"] == "ACTIONLINT_EXIT_2"
+
+
+def test_actionlint_malformed_json_is_unknown_error(tmp_path: Path) -> None:
+    repo, sha = repo_with_workflow(tmp_path, "name: CI\non: push\njobs: {}\n")
+    runner = FakeRunner(lint=[cp(1, "not-json")])
+
+    item = collect_actionlint_evidence(
+        repo,
+        repository="acme/demo",
+        target_commit_sha=sha,
+        runner=runner,
+    )[0]
+
+    assert item["observation"]["actionlint_state"] == "UNKNOWN_ERROR"
+    assert item["observation"]["error_code"] == "MALFORMED_ACTIONLINT_OUTPUT"

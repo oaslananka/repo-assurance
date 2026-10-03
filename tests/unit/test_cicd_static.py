@@ -248,3 +248,19 @@ def test_first_class_actionlint_unavailable_is_not_pass() -> None:
     source = workflow_evidence(".github/workflows/ci.yml", "name: CI\non: push\njobs: {}\n")
     item = result(evaluate_ci_static([source], specialist_evidence=[actionlint_evidence("UNAVAILABLE")]), "CI-STATIC-001")
     assert item["state"] == "UNAVAILABLE"
+
+
+def test_first_class_actionlint_unknown_error_propagates() -> None:
+    source = workflow_evidence(
+        ".github/workflows/ci.yml",
+        "name: CI\non: push\njobs: {}\n",
+    )
+    item = result(
+        evaluate_ci_static(
+            [source],
+            specialist_evidence=[actionlint_evidence("UNKNOWN_ERROR")],
+        ),
+        "CI-STATIC-001",
+    )
+    assert item["state"] == "UNKNOWN_ERROR"
+    assert item["reason"] == "actionlint_execution_error"

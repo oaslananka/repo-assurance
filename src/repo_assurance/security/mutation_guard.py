@@ -13,7 +13,7 @@ Executor = Callable[..., subprocess.CompletedProcess[str]]
 
 
 class ReadOnlyCommandRunner:
-    """Execute only explicitly recognized read-only Git and GitHub CLI commands."""
+    """Execute only explicitly recognized read-only Git, GitHub, and specialist commands."""
 
     def __init__(self, executor: Executor = subprocess.run) -> None:
         self._executor = executor
