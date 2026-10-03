@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "repo-assurance"
-version = "0.2.0"
+version = "0.2.1"
 description = "Evidence-driven repository assurance orchestrator"
 readme = "README.md"
 license = "MIT"
@@ -32,6 +32,10 @@ release = ["build>=1.2,<2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+"share/repo-assurance/controls" = ["controls/*.json"]
+"share/repo-assurance/schemas" = ["schemas/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -23,7 +24,10 @@ def _control_dir() -> Path:
     override = os.environ.get("REPO_ASSURANCE_CONTROL_DIR")
     if override:
         return Path(override)
-    return Path(__file__).resolve().parents[3] / "controls"
+    source_directory = Path(__file__).resolve().parents[3] / "controls"
+    if source_directory.is_dir():
+        return source_directory
+    return Path(sys.prefix) / "share" / "repo-assurance" / "controls"
 
 
 

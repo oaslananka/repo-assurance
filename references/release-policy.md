@@ -57,8 +57,9 @@ The Release Validation workflow runs on `v*` tags and explicit `workflow_dispatc
 3. installs hash-locked dependencies from `requirements/ci.lock`;
 4. runs the full test/compile/catalog validation gates;
 5. runs `scripts/build_release.py`;
-6. verifies `SHA256SUMS`;
-7. uploads the release artifact directory as a GitHub Actions artifact.
+6. installs the built wheel into a temporary environment and verifies that the installed package can load the shipped control catalog, JSON schemas, and CLI parser without relying on the source checkout;
+7. verifies `SHA256SUMS`;
+8. uploads the release artifact directory as a GitHub Actions artifact.
 
 Release Validation is deliberately **non-publishing**. It uses read-only repository permissions and does not publish to PyPI, create a GitHub Release, update a plugin registry, or deploy anything.
 
@@ -78,7 +79,7 @@ The publication workflow does not rebuild the project. It verifies that the supp
 
 Run the `testpypi` stage first. It publishes only the validated wheel and source distribution through the GitHub environment named `testpypi` using OpenID Connect Trusted Publishing. PEP 740 attestations are enabled explicitly.
 
-After upload, the workflow waits for TestPyPI metadata, compares the published wheel/sdist filenames and SHA-256 digests with the validated artifacts, installs the exact staged version from TestPyPI on a clean runner, and executes a CLI smoke test.
+After upload, the workflow waits for TestPyPI metadata, compares the published wheel/sdist filenames and SHA-256 digests with the validated artifacts, installs the exact validated wheel into a temporary environment, and verifies package version, control-catalog loading, schema loading, and the CLI parser.
 
 ### Production publication
 
@@ -86,7 +87,7 @@ Run the `production` stage only after TestPyPI staging succeeds. Before any prod
 
 The production job then publishes the same validated distributions through the GitHub environment named `pypi` using OpenID Connect Trusted Publishing with PEP 740 attestations. It does not use `skip-existing`; duplicate or partial production versions fail loudly.
 
-After upload, the workflow verifies PyPI filenames and SHA-256 digests against the validated artifacts, installs the exact production version from PyPI, and smoke-tests the CLI. Only after those checks pass does it create the GitHub Release and attach the complete validated artifact set.
+After upload, the workflow verifies PyPI filenames and SHA-256 digests against the validated artifacts and repeats the installed-wheel runtime verification. Only after those checks pass does it create the GitHub Release and attach the complete validated artifact set.
 
 Both package-index environments are credentialless from the repository's perspective: no long-lived PyPI or TestPyPI API token belongs in repository or environment secrets. The corresponding Trusted Publisher configuration is a one-time external prerequisite for each index.
 
