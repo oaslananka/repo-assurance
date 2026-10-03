@@ -116,7 +116,7 @@ def test_actionlint_stdin_mode_is_allowlisted() -> None:
     calls = []
     def fake_executor(command, **kwargs):
         calls.append((command, kwargs.get("input")))
-        return subprocess.CompletedProcess(command, 0, "[]", "")
+        return subprocess.CompletedProcess(["actionlint"], 0, "[]", "")
     runner = ReadOnlyCommandRunner(executor=fake_executor)
     argv = ["actionlint", "-no-color", "-shellcheck=", "-pyflakes=", "-format", "{{json .}}", "-stdin-filename", ".github/workflows/ci.yml", "-"]
     result = runner.run(argv, stdin_text="name: CI\n")
