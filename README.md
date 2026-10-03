@@ -25,12 +25,26 @@ External provider assurance now includes a versioned provider-state contract and
 - `gh` for GitHub live-state collection (audits degrade explicitly when it is unavailable)
 - `actionlint` for first-class GitHub Actions syntax/semantic validation (CI-STATIC-001 becomes explicit `UNAVAILABLE` when it is not installed)
 
-Development:
+Development compatibility install:
 
 ```bash
-python -m pip install -e '.[dev]'
+python -m pip install -e '.[dev,plugin]'
 pytest -q
 ```
+
+The required CI lane uses a reproducible dependency baseline instead of resolving
+ranges on every run:
+
+```bash
+python -m pip install --require-hashes -r requirements/ci.lock
+python -m pip install --no-deps --no-build-isolation -e .
+pytest -q
+```
+
+See [`references/reproducibility-policy.md`](references/reproducibility-policy.md)
+for baseline scope, lock freshness verification, intentional `--upgrade`
+regeneration, and the distinction between reproducibility observations and
+security findings.
 
 ### GitHub Actions supply-chain policy
 
