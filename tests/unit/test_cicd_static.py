@@ -74,7 +74,7 @@ def test_missing_permissions_are_inconclusive_not_implicitly_safe() -> None:
     assert item["reason"] == "workflow_permissions_not_explicit"
 
 
-def test_action_refs_classify_sha_tag_branch_local_and_docker() -> None:
+def test_action_refs_distinguish_steps_from_reusable_workflows() -> None:
     sha = "b" * 40
     analysis = inspect_workflow_source(
         ".github/workflows/ci.yml",
@@ -84,23 +84,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: third/secure@{sha}
-      - uses: actions/checkout@v4
-      - uses: third/custom@main
+      - uses: actions/checkout@v7
+      - name: custom
+        uses: third/custom@main
       - uses: ./local-action
       - uses: docker://alpine:3.20
+  reusable:
+    uses: acme/shared/.github/workflows/test.yml@v2
 """,
     )
 
     assert [(item["uses"], item["ref_kind"]) for item in analysis["actions"]] == [
         (f"third/secure@{sha}", "full_sha"),
-        ("actions/checkout@v4", "tag"),
+        ("actions/checkout@v7", "tag"),
         ("third/custom@main", "branch"),
         ("./local-action", "local"),
         ("docker://alpine:3.20", "docker"),
     ]
+    assert analysis["reusable_workflows"] == [
+        {
+            "uses": "acme/shared/.github/workflows/test.yml@v2",
+            "ref": "v2",
+            "ref_kind": "tag",
+        }
+    ]
 
 
-def test_mutable_third_party_action_ref_is_finding() -> None:
+def test_mutable_first_and_third_party_action_refs_are_findings() -> None:
     evidence = workflow_evidence(
         ".github/workflows/ci.yml",
         """name: CI
@@ -108,16 +118,54 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - uses: third/custom@main
-      - uses: actions/checkout@v4
 """,
     )
 
-    results = evaluate_ci_static([evidence])
+    item = result(evaluate_ci_static([evidence]), "CI-STATIC-004")
 
-    item = result(results, "CI-STATIC-004")
     assert item["state"] == "FINDING"
-    assert item["reason"] == "mutable_third_party_action_refs:third/custom@main"
+    assert item["reason"] == (
+        "mutable_action_refs:actions/checkout@v7,third/custom@main"
+    )
+
+
+def test_full_sha_action_refs_pass_for_github_and_third_party() -> None:
+    first_party_sha = "a" * 40
+    third_party_sha = "b" * 40
+    evidence = workflow_evidence(
+        ".github/workflows/ci.yml",
+        f"""name: CI
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@{first_party_sha}
+      - uses: third/custom@{third_party_sha}
+      - uses: ./local-action
+      - uses: docker://alpine:3.20
+""",
+    )
+
+    item = result(evaluate_ci_static([evidence]), "CI-STATIC-004")
+
+    assert item["state"] == "PASS"
+
+
+def test_reusable_workflow_tag_is_not_an_action_pin_finding() -> None:
+    evidence = workflow_evidence(
+        ".github/workflows/ci.yml",
+        """name: CI
+jobs:
+  delegated:
+    uses: acme/shared/.github/workflows/test.yml@v2
+""",
+    )
+
+    item = result(evaluate_ci_static([evidence]), "CI-STATIC-004")
+
+    assert item["state"] == "PASS"
 
 
 def test_false_green_patterns_are_detected_without_treating_all_shell_as_bad() -> None:

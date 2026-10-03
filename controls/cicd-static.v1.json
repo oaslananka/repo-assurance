@@ -84,9 +84,9 @@
     {
       "schema_version": "control/v1",
       "id": "CI-STATIC-004",
-      "title": "Third-party action references are classified",
+      "title": "Remote action references are immutable",
       "domain": "cicd-static",
-      "description": "Third-party action references are classified.",
+      "description": "Remote GitHub Actions used in workflow steps are pinned to a full-length commit SHA. GitHub-authored actions are not exempt; local actions and reusable workflow references are classified separately.",
       "evaluator": "cicd_static.action_refs",
       "applicability": {
         "all_capabilities": [

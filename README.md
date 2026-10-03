@@ -32,6 +32,15 @@ python -m pip install -e '.[dev]'
 pytest -q
 ```
 
+### GitHub Actions supply-chain policy
+
+Remote step actions are expected to be pinned to full 40-character commit SHAs,
+including GitHub-authored `actions/*` references. Reusable workflow references are
+classified separately. See
+[`references/action-reference-policy.md`](references/action-reference-policy.md)
+for the threat model, exceptions, and the distinction between immutability and
+version freshness.
+
 ## CLI
 
 Discover repository facts without producing findings:
