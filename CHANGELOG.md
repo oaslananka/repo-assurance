@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-03
+
+### Fixed
+
+- Ship the canonical control catalog and JSON schemas with Python distributions so `plan`, `audit`, and `validate` work from normal `pip`/`pipx` installations outside a source checkout.
+- Release and publication smoke gates now install the built wheel in an isolated environment and load its control catalog and schemas, preventing parser-only checks from missing runtime packaging regressions.
+
 ## [0.2.0] - 2026-10-03
 
 ### Added
