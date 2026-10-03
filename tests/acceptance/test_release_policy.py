@@ -59,7 +59,7 @@ def test_release_workflow_is_tagged_sha_pinned_and_nonpublishing() -> None:
     assert "--only-binary=:all:" in workflow
     assert "fetch-depth: 0" in workflow
     assert "python scripts/build_release.py" in workflow
-    assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
+    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
     assert "dist/release" in workflow
     assert "pypi" not in workflow.lower()
     assert "twine" not in workflow.lower()
@@ -138,3 +138,16 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "jsonschema>=4.23,<5" not in workflow
     assert "repo-assurance==$VERSION" not in workflow
     assert "repo-assurance --help" not in workflow
+
+
+def test_release_upload_artifact_runtime_is_node24_pinned() -> None:
+    release_workflow = WORKFLOW.read_text(encoding="utf-8")
+    publish_workflow = PUBLISH_WORKFLOW.read_text(encoding="utf-8")
+    expected = (
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    )
+
+    assert expected in release_workflow
+    assert expected in publish_workflow
+    assert "ea165f8d65b6e75b540449e92b4886f43607fa02" not in release_workflow
+    assert "ea165f8d65b6e75b540449e92b4886f43607fa02" not in publish_workflow
