@@ -234,7 +234,10 @@ def test_first_class_actionlint_pass_drives_ci_static_001() -> None:
     source = workflow_evidence(".github/workflows/ci.yml", "name: CI\non: push\njobs: {}\n")
     item = result(evaluate_ci_static([source], specialist_evidence=[actionlint_evidence("PASS")]), "CI-STATIC-001")
     assert item["state"] == "PASS"
-    assert item["evidence_ids"] == ["ev_actionlint_ci"]
+    assert item["evidence_ids"] == [
+        "ev_actionlint_ci",
+        "ev_workflow_.github_workflows_ci.yml",
+    ]
 
 
 def test_first_class_actionlint_finding_drives_ci_static_001() -> None:

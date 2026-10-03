@@ -182,11 +182,15 @@ def _evaluate_actionlint_validity(
     specialist_evidence: Sequence[Mapping[str, Any]] | None,
     subject: Mapping[str, Any],
 ) -> dict[str, Any]:
+    source_ids = [
+        str(item.get("id")) for item in workflow_evidence if item.get("id")
+    ]
     if specialist_evidence is not None:
         specialists = list(specialist_evidence)
         specialist_ids = [
             str(item.get("id")) for item in specialists if item.get("id")
         ]
+        validity_ids = sorted(set(source_ids + specialist_ids))
         states: list[str] = []
         for item in specialists:
             observation = item.get("observation")
@@ -200,7 +204,7 @@ def _evaluate_actionlint_validity(
                 "CI-STATIC-001",
                 "FINDING",
                 subject,
-                specialist_ids,
+                validity_ids,
                 reason="actionlint_validation_failed",
                 candidate="candidate_CI-STATIC-001_workflow_invalid",
             )
@@ -209,7 +213,7 @@ def _evaluate_actionlint_validity(
                 "CI-STATIC-001",
                 "UNKNOWN_ERROR",
                 subject,
-                specialist_ids,
+                validity_ids,
                 reason="actionlint_execution_error",
             )
         if states and all(state == "PASS" for state in states):
@@ -217,14 +221,14 @@ def _evaluate_actionlint_validity(
                 "CI-STATIC-001",
                 "PASS",
                 subject,
-                specialist_ids,
+                validity_ids,
             )
         if states and all(state == "UNAVAILABLE" for state in states):
             return _result(
                 "CI-STATIC-001",
                 "UNAVAILABLE",
                 subject,
-                specialist_ids,
+                validity_ids,
                 reason="actionlint_executable_unavailable",
             )
         if states:
@@ -232,20 +236,18 @@ def _evaluate_actionlint_validity(
                 "CI-STATIC-001",
                 "INCONCLUSIVE",
                 subject,
-                specialist_ids,
+                validity_ids,
                 reason="actionlint_evidence_partial",
             )
         return _result(
             "CI-STATIC-001",
             "INCONCLUSIVE",
             subject,
-            specialist_ids,
+            validity_ids,
             reason="actionlint_evidence_unavailable",
         )
 
-    evidence_ids = [
-        str(item.get("id")) for item in workflow_evidence if item.get("id")
-    ]
+    evidence_ids = source_ids
     states: list[str] = []
     for item in workflow_evidence:
         observation = item.get("observation")

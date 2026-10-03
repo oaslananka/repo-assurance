@@ -66,6 +66,7 @@ def test_actionlint_finding_drops_snippet(tmp_path: Path) -> None:
         "line": 1,
         "column": 1,
         "end_column": 5,
+        "end_line": 2,
         "kind": "syntax-check",
         "snippet": "name: CI",
     }]
@@ -76,6 +77,7 @@ def test_actionlint_finding_drops_snippet(tmp_path: Path) -> None:
     assert item["observation"]["actionlint_state"] == "FINDING"
     diagnostic = item["observation"]["diagnostics"][0]
     assert diagnostic["kind"] == "syntax-check"
+    assert diagnostic["end_line"] == 2
     assert "snippet" not in diagnostic
 
 

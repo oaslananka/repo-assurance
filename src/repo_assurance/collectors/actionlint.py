@@ -55,7 +55,7 @@ def _diagnostics(stdout: str) -> list[dict[str, Any]] | None:
             value = raw.get(key)
             if isinstance(value, str):
                 item[key] = value
-        for key in ("line", "column", "end_column"):
+        for key in ("line", "column", "end_line", "end_column"):
             value = raw.get(key)
             if isinstance(value, int) and not isinstance(value, bool):
                 item[key] = value
@@ -123,6 +123,108 @@ def _evidence(
     return sanitized
 
 
+def _detect_actionlint_version(
+    transport: Runner,
+) -> tuple[str | None, int, str | None]:
+    result = transport.run(["actionlint", "-version"])
+    version = _tool_version(result.stdout)
+    if result.returncode == 127:
+        return None, 127, "ACTIONLINT_NOT_FOUND"
+    if result.returncode != 0:
+        return (
+            version,
+            result.returncode,
+            f"ACTIONLINT_VERSION_EXIT_{result.returncode}",
+        )
+    return version, 0, None
+
+
+def _lint_workflow(
+    *,
+    transport: Runner,
+    isolated_cwd: Path,
+    repo: Path,
+    repository: str,
+    target_commit_sha: str,
+    path: str,
+    version: str | None,
+) -> dict[str, Any]:
+    text = read_commit_text(repo, target_commit_sha, path)
+    if text is None:
+        return _evidence(
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            path=path,
+            state="UNKNOWN_ERROR",
+            version=version,
+            exit_code=1,
+            diagnostics=[],
+            error_code="SOURCE_SNAPSHOT_READ_FAILED",
+        )
+
+    argv = [
+        "actionlint",
+        "-no-color",
+        "-shellcheck=",
+        "-pyflakes=",
+        "-format",
+        "{{json .}}",
+        "-stdin-filename",
+        path,
+        "-",
+    ]
+    result = transport.run(
+        argv,
+        cwd=isolated_cwd,
+        stdin_text=text,
+    )
+    if result.returncode not in {0, 1}:
+        return _evidence(
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            path=path,
+            state="UNKNOWN_ERROR",
+            version=version,
+            exit_code=result.returncode,
+            diagnostics=[],
+            error_code=f"ACTIONLINT_EXIT_{result.returncode}",
+        )
+
+    diagnostics = _diagnostics(result.stdout)
+    if diagnostics is None:
+        return _evidence(
+            repository=repository,
+            target_commit_sha=target_commit_sha,
+            path=path,
+            state="UNKNOWN_ERROR",
+            version=version,
+            exit_code=result.returncode,
+            diagnostics=[],
+            error_code="MALFORMED_ACTIONLINT_OUTPUT",
+        )
+
+    if diagnostics:
+        state = "FINDING"
+        error_code = None
+    elif result.returncode == 0:
+        state = "PASS"
+        error_code = None
+    else:
+        state = "UNKNOWN_ERROR"
+        error_code = "ACTIONLINT_FAILED_WITHOUT_DIAGNOSTICS"
+
+    return _evidence(
+        repository=repository,
+        target_commit_sha=target_commit_sha,
+        path=path,
+        state=state,
+        version=version,
+        exit_code=result.returncode,
+        diagnostics=diagnostics,
+        error_code=error_code,
+    )
+
+
 def collect_actionlint_evidence(
     repo: Path,
     *,
@@ -136,127 +238,34 @@ def collect_actionlint_evidence(
         return []
 
     transport = runner or ReadOnlyCommandRunner()
-    version_result = transport.run(["actionlint", "-version"])
-    version = _tool_version(version_result.stdout)
-
-    if version_result.returncode == 127:
+    version, version_exit, version_error = _detect_actionlint_version(transport)
+    if version_error is not None:
+        state = "UNAVAILABLE" if version_exit == 127 else "UNKNOWN_ERROR"
         return [
             _evidence(
                 repository=repository,
                 target_commit_sha=target_commit_sha,
                 path=path,
-                state="UNAVAILABLE",
-                version=None,
-                exit_code=127,
-                diagnostics=[],
-                error_code="ACTIONLINT_NOT_FOUND",
-            )
-            for path in paths
-        ]
-    if version_result.returncode != 0:
-        return [
-            _evidence(
-                repository=repository,
-                target_commit_sha=target_commit_sha,
-                path=path,
-                state="UNKNOWN_ERROR",
+                state=state,
                 version=version,
-                exit_code=version_result.returncode,
+                exit_code=version_exit,
                 diagnostics=[],
-                error_code=f"ACTIONLINT_VERSION_EXIT_{version_result.returncode}",
+                error_code=version_error,
             )
             for path in paths
         ]
 
-    evidence: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="repo-assurance-actionlint-") as temp:
         isolated_cwd = Path(temp)
-        for path in paths:
-            text = read_commit_text(repo, target_commit_sha, path)
-            if text is None:
-                evidence.append(
-                    _evidence(
-                        repository=repository,
-                        target_commit_sha=target_commit_sha,
-                        path=path,
-                        state="UNKNOWN_ERROR",
-                        version=version,
-                        exit_code=1,
-                        diagnostics=[],
-                        error_code="SOURCE_SNAPSHOT_READ_FAILED",
-                    )
-                )
-                continue
-
-            argv = [
-                "actionlint",
-                "-no-color",
-                "-shellcheck=",
-                "-pyflakes=",
-                "-format",
-                "{{json .}}",
-                "-stdin-filename",
-                path,
-                "-",
-            ]
-            result = transport.run(
-                argv,
-                cwd=isolated_cwd,
-                stdin_text=text,
+        return [
+            _lint_workflow(
+                transport=transport,
+                isolated_cwd=isolated_cwd,
+                repo=repo,
+                repository=repository,
+                target_commit_sha=target_commit_sha,
+                path=path,
+                version=version,
             )
-
-            if result.returncode not in {0, 1}:
-                evidence.append(
-                    _evidence(
-                        repository=repository,
-                        target_commit_sha=target_commit_sha,
-                        path=path,
-                        state="UNKNOWN_ERROR",
-                        version=version,
-                        exit_code=result.returncode,
-                        diagnostics=[],
-                        error_code=f"ACTIONLINT_EXIT_{result.returncode}",
-                    )
-                )
-                continue
-
-            diagnostics = _diagnostics(result.stdout)
-            if diagnostics is None:
-                evidence.append(
-                    _evidence(
-                        repository=repository,
-                        target_commit_sha=target_commit_sha,
-                        path=path,
-                        state="UNKNOWN_ERROR",
-                        version=version,
-                        exit_code=result.returncode,
-                        diagnostics=[],
-                        error_code="MALFORMED_ACTIONLINT_OUTPUT",
-                    )
-                )
-                continue
-
-            if diagnostics:
-                state = "FINDING"
-                error_code = None
-            elif result.returncode == 0:
-                state = "PASS"
-                error_code = None
-            else:
-                state = "UNKNOWN_ERROR"
-                error_code = "ACTIONLINT_FAILED_WITHOUT_DIAGNOSTICS"
-
-            evidence.append(
-                _evidence(
-                    repository=repository,
-                    target_commit_sha=target_commit_sha,
-                    path=path,
-                    state=state,
-                    version=version,
-                    exit_code=result.returncode,
-                    diagnostics=diagnostics,
-                    error_code=error_code,
-                )
-            )
-
-    return evidence
+            for path in paths
+        ]
