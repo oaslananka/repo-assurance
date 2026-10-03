@@ -59,6 +59,10 @@ def test_release_workflow_is_tagged_sha_pinned_and_nonpublishing() -> None:
     assert "--only-binary=:all:" in workflow
     assert "fetch-depth: 0" in workflow
     assert "python scripts/build_release.py" in workflow
+    assert "Smoke-test installed wheel runtime" in workflow
+    assert "python -m venv --system-site-packages" in workflow
+    assert "from repo_assurance.core.catalog import load_catalog" in workflow
+    assert "from repo_assurance.core.schema import load_schema" in workflow
     assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
     assert "dist/release" in workflow
     assert "pypi" not in workflow.lower()
@@ -132,8 +136,11 @@ def test_publish_workflow_reuses_validated_artifacts() -> None:
     assert "scripts/verify_pypi_release.py" in workflow
     assert workflow.count("--only-binary=:all: --require-hashes -r requirements/ci.lock") == 3
     assert "--no-index --no-deps" not in workflow
-    assert workflow.count('PYTHONPATH="$WHEEL" VERSION="$VERSION" python') == 3
+    assert 'PYTHONPATH="$WHEEL"' not in workflow
+    assert workflow.count("python -m venv --system-site-packages") == 3
     assert workflow.count("from repo_assurance.cli import build_parser") == 3
+    assert workflow.count("from repo_assurance.core.catalog import load_catalog") == 3
+    assert workflow.count("from repo_assurance.core.schema import load_schema") == 3
     assert workflow.count("repo_assurance-*.whl") >= 5
     assert "jsonschema>=4.23,<5" not in workflow
     assert "repo-assurance==$VERSION" not in workflow
