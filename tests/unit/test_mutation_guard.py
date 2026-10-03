@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
@@ -62,6 +63,28 @@ def test_read_only_commands_are_allowed(argv: list[str]) -> None:
 
     assert result.returncode == 0
     assert calls == [argv]
+
+
+
+def test_runner_decodes_command_output_as_utf8_independent_of_host_locale() -> None:
+    captured: dict[str, object] = {}
+
+    def fake_executor(command, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            args=command,
+            returncode=0,
+            stdout='{"name":"İzmir"}',
+            stderr="",
+        )
+
+    runner = ReadOnlyCommandRunner(executor=fake_executor)
+    result = runner.run(["gh", "api", "/repos/acme/demo"])
+
+    assert result.returncode == 0
+    assert captured["text"] is True
+    assert captured["encoding"] == "utf-8"
+    assert captured["errors"] == "replace"
 
 
 def test_unknown_command_family_is_blocked_by_default() -> None:

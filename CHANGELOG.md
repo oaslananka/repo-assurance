@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-03
+
+### Fixed
+
+- Decode read-only Git, GitHub CLI, and specialist-command output explicitly as UTF-8 instead of relying on the host locale, preventing Windows non-UTF-8 code pages such as cp1254 from crashing audit subprocess readers.
+- Treat missing or malformed successful GitHub CLI output as explicit `UNKNOWN_ERROR` evidence instead of raising a secondary JSON `TypeError`.
+
 ## [0.2.1] - 2026-10-03
 
 ### Fixed
