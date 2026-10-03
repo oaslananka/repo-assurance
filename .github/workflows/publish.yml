@@ -220,18 +220,28 @@ jobs:
           VERSION="${EXPECTED_TAG#v}"
           python -m pip install --disable-pip-version-check \
             --only-binary=:all: --require-hashes -r requirements/ci.lock
-          python -m pip install --disable-pip-version-check \
-            --only-binary=:all: --no-index --no-deps dist/release/repo_assurance-*.whl
-          VERSION="$VERSION" python - <<'PY'
+          WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
+          test -n "$WHEEL"
+          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
           import importlib.metadata
           import os
+
+          from repo_assurance.cli import build_parser
 
           actual = importlib.metadata.version("repo-assurance")
           expected = os.environ["VERSION"]
           if actual != expected:
-              raise SystemExit(f"installed version {actual!r} != expected {expected!r}")
+              raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
+
+          parser = build_parser()
+          try:
+              parser.parse_args(["--help"])
+          except SystemExit as exc:
+              if exc.code != 0:
+                  raise
+          else:
+              raise SystemExit("CLI --help did not exit")
           PY
-          repo-assurance --help >/dev/null
 
   verify-testpypi-gate:
     name: verify-testpypi-production-gate
@@ -275,18 +285,28 @@ jobs:
           VERSION="${EXPECTED_TAG#v}"
           python -m pip install --disable-pip-version-check \
             --only-binary=:all: --require-hashes -r requirements/ci.lock
-          python -m pip install --disable-pip-version-check \
-            --only-binary=:all: --no-index --no-deps dist/release/repo_assurance-*.whl
-          VERSION="$VERSION" python - <<'PY'
+          WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
+          test -n "$WHEEL"
+          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
           import importlib.metadata
           import os
+
+          from repo_assurance.cli import build_parser
 
           actual = importlib.metadata.version("repo-assurance")
           expected = os.environ["VERSION"]
           if actual != expected:
-              raise SystemExit(f"installed version {actual!r} != expected {expected!r}")
+              raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
+
+          parser = build_parser()
+          try:
+              parser.parse_args(["--help"])
+          except SystemExit as exc:
+              if exc.code != 0:
+                  raise
+          else:
+              raise SystemExit("CLI --help did not exit")
           PY
-          repo-assurance --help >/dev/null
 
   publish-pypi:
     name: publish-pypi
@@ -364,18 +384,28 @@ jobs:
           VERSION="${EXPECTED_TAG#v}"
           python -m pip install --disable-pip-version-check \
             --only-binary=:all: --require-hashes -r requirements/ci.lock
-          python -m pip install --disable-pip-version-check \
-            --only-binary=:all: --no-index --no-deps dist/release/repo_assurance-*.whl
-          VERSION="$VERSION" python - <<'PY'
+          WHEEL="$(find dist/release -maxdepth 1 -type f -name 'repo_assurance-*.whl' -print -quit)"
+          test -n "$WHEEL"
+          PYTHONPATH="$WHEEL" VERSION="$VERSION" python - <<'PY'
           import importlib.metadata
           import os
+
+          from repo_assurance.cli import build_parser
 
           actual = importlib.metadata.version("repo-assurance")
           expected = os.environ["VERSION"]
           if actual != expected:
-              raise SystemExit(f"installed version {actual!r} != expected {expected!r}")
+              raise SystemExit(f"wheel version {actual!r} != expected {expected!r}")
+
+          parser = build_parser()
+          try:
+              parser.parse_args(["--help"])
+          except SystemExit as exc:
+              if exc.code != 0:
+                  raise
+          else:
+              raise SystemExit("CLI --help did not exit")
           PY
-          repo-assurance --help >/dev/null
 
   publish-github-release:
     name: publish-github-release
