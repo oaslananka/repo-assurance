@@ -159,6 +159,44 @@ def test_priority_findings_are_sorted_by_priority() -> None:
     assert markdown.index("P1") < markdown.index("P4")
 
 
+def test_generic_control_finding_is_visible_in_priority_markdown() -> None:
+    generic = group(
+        finding_type="CONTROL_FINDING",
+        identifier=".github/workflows/ci.yml",
+        fingerprint="sha256:" + "d" * 64,
+    )
+    generic["root_discriminator"] = "control-finding:CI-STATIC-003"
+    generic["control_ids"] = ["CI-STATIC-003"]
+    generic["proposed_severities"] = ["MEDIUM"]
+    generic["proposed_confidences"] = ["HIGH"]
+
+    findings = materialize_findings([generic], baseline_as_of="2026-10-02")
+    report = build_audit_report(
+        audit_id="audit_1",
+        mode="standard",
+        started_at="2026-10-02T20:00:00Z",
+        completed_at="2026-10-02T20:05:00Z",
+        baseline_as_of="2026-10-02",
+        repository={"full_name": "acme/demo"},
+        snapshot={"target_branch": "main", "target_commit_sha": "b" * 40},
+        profile={},
+        audit_plan=base_plan(),
+        coverage={},
+        control_results=[],
+        providers=[],
+        findings=findings,
+        observations=[],
+        blind_spots=[],
+        remediation_tracks=[],
+    )
+
+    markdown = render_markdown(report)
+
+    assert findings[0]["id"] in markdown
+    assert "CI-STATIC-003 reported a material finding" in markdown
+    assert "CI-STATIC-003" in markdown
+
+
 def test_operational_and_governance_types_get_specific_titles() -> None:
     cases = [
         ("CHRONIC_FAILURE", "CI workflow is chronically failing"),

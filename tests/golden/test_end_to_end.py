@@ -221,6 +221,32 @@ def test_permission_limited_github_never_materializes_clean_governance_claim() -
     assert canonicalize(results, [repo, branch, denied]) == []
 
 
+def test_unmapped_static_failure_reaches_canonical_findings() -> None:
+    source = workflow_source(
+        """name: CI
+permissions: write-all
+jobs:
+  test:
+    runs-on: ubuntu-latest
+"""
+    )
+    results = evaluate_ci_static([source])
+
+    permission_result = next(
+        item for item in results if item["control_id"] == "CI-STATIC-003"
+    )
+    assert permission_result["state"] == "FINDING"
+
+    findings = canonicalize(results, [source])
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding["type"] == "CONTROL_FINDING"
+    assert finding["control_ids"] == ["CI-STATIC-003"]
+    assert finding["evidence_ids"] == ["ev_workflow"]
+    assert finding["output_class"] == "FINDING"
+
+
 def test_retiring_runner_materializes_deprecation_risk() -> None:
     source = workflow_source("name: CI\npermissions: read-all\njobs:\n  test:\n    runs-on: macos-14\n")
     baseline = {
