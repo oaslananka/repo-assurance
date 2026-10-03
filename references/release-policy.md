@@ -64,21 +64,33 @@ Release Validation is deliberately **non-publishing**. It uses read-only reposit
 
 ## Authorized publication
 
-Creating a public GitHub Release or publishing to PyPI requires **explicit authorization** after a successful Release Validation run.
+Creating a public GitHub Release or publishing to a package index requires **explicit authorization** after a successful Release Validation run.
 
 `.github/workflows/publish.yml` is manual-only and accepts:
 
 - the exact existing release tag;
 - the successful Release Validation workflow run ID for that tag;
-- a publication target: `github`, `pypi`, or `both`.
+- a publication stage: `testpypi` or `production`.
 
-The publication workflow does not rebuild the project. It verifies that the supplied run is a successful Release Validation run for the exact tag commit, downloads that run's named artifact set, verifies `SHA256SUMS` and `release-manifest.json`, and then republishes those exact bytes.
+The publication workflow does not rebuild the project. It verifies that the supplied run is a successful Release Validation run for the exact tag commit, downloads that run's named artifact set, verifies `SHA256SUMS` and `release-manifest.json`, and reuses those exact bytes.
 
-GitHub Release publication attaches the complete validated artifact set. PyPI publication selects only the validated wheel and source distribution.
+### TestPyPI staging
 
-PyPI publication uses OpenID Connect Trusted Publishing through the protected GitHub environment named `pypi`; no long-lived PyPI API token belongs in repository secrets. The corresponding PyPI Trusted Publisher configuration is a one-time external prerequisite for the first upload.
+Run the `testpypi` stage first. It publishes only the validated wheel and source distribution through the GitHub environment named `testpypi` using OpenID Connect Trusted Publishing. PEP 740 attestations are enabled explicitly.
 
-If one external publication target succeeds and another fails, rerun the workflow only for the failed target. Do not rebuild or silently replace an already published version.
+After upload, the workflow waits for TestPyPI metadata, compares the published wheel/sdist filenames and SHA-256 digests with the validated artifacts, installs the exact staged version from TestPyPI on a clean runner, and executes a CLI smoke test.
+
+### Production publication
+
+Run the `production` stage only after TestPyPI staging succeeds. Before any production credential is requested, the workflow independently re-checks that TestPyPI still exposes exactly the validated wheel/sdist bytes and repeats the CLI smoke test.
+
+The production job then publishes the same validated distributions through the GitHub environment named `pypi` using OpenID Connect Trusted Publishing with PEP 740 attestations. It does not use `skip-existing`; duplicate or partial production versions fail loudly.
+
+After upload, the workflow verifies PyPI filenames and SHA-256 digests against the validated artifacts, installs the exact production version from PyPI, and smoke-tests the CLI. Only after those checks pass does it create the GitHub Release and attach the complete validated artifact set.
+
+Both package-index environments are credentialless from the repository's perspective: no long-lived PyPI or TestPyPI API token belongs in repository or environment secrets. The corresponding Trusted Publisher configuration is a one-time external prerequisite for each index.
+
+Publication attempts for the same release tag are serialized with a workflow concurrency group. Do not rebuild or silently replace an already published version.
 
 ## Security and provenance
 
@@ -88,7 +100,9 @@ Release automation must preserve:
 - full-SHA-pinned remote GitHub Actions;
 - locked dependency installation during validation;
 - no secret-bearing publishing credentials in the validation workflow;
-- PyPI Trusted Publishing with short-lived OIDC identity;
+- PyPI and TestPyPI Trusted Publishing with short-lived OIDC identity;
+- PEP 740 attestations for wheel and source-distribution uploads;
+- package-index filename and SHA-256 verification before advancing release stages;
 - no mutation of repository source during artifact construction;
 - publication only from the already validated artifact set.
 

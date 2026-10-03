@@ -205,14 +205,25 @@ cd dist/release
 sha256sum --check SHA256SUMS
 ```
 
-The validation workflow does **not** publish to PyPI, create a GitHub Release, deploy,
-or update external plugin registries. Publication is a separate owner-authorized
-manual workflow that takes the exact release tag and successful validation run ID,
-then reuses the already validated artifact bytes without rebuilding them.
+The validation workflow does **not** publish to package indexes, create a GitHub
+Release, deploy, or update external plugin registries. Publication is a separate
+owner-authorized manual workflow that takes the exact release tag and successful
+validation run ID, then reuses the already validated artifact bytes without rebuilding
+them.
 
-PyPI uses Trusted Publishing through the GitHub environment named `pypi`. The
-one-time PyPI publisher configuration must name this repository and
-`.github/workflows/publish.yml`.
+Publication is intentionally two-stage:
+
+1. run `Publish Validated Release` with target `testpypi`; the workflow publishes
+   the validated wheel/sdist with OIDC Trusted Publishing, verifies their SHA-256
+   digests against the validated release set, and smoke-tests the staged CLI;
+2. run it again with target `production`; the workflow re-verifies the TestPyPI
+   stage, publishes the same bytes to PyPI, verifies and smoke-tests the production
+   package, and only then creates the GitHub Release.
+
+TestPyPI uses the GitHub environment `testpypi`; production PyPI uses `pypi`.
+Both Trusted Publisher configurations must name this repository and
+`.github/workflows/publish.yml`. No long-lived package-index API token is required.
+PEP 740 attestations are enabled for both package-index uploads.
 
 See `references/release-policy.md`, `references/release-checklist.md`, and
 `CHANGELOG.md`.
