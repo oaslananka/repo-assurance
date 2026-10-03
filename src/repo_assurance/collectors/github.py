@@ -119,7 +119,7 @@ def _collect_json(
         return None, evidence
     try:
         payload = json.loads(result.stdout)
-    except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
+    except json.JSONDecodeError:
         evidence = _make_evidence(
             evidence_id=evidence_id,
             repository=repository,
