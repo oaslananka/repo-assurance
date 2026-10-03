@@ -11,6 +11,7 @@ The current MVP vertical slice focuses on:
 - immutable repository snapshot and local/remote drift;
 - repository/language/build-test discovery;
 - GitHub rules/protection/check visibility;
+- GitHub-native security and dependency assurance (CodeQL/code scanning, secret scanning, dependency graph/SBOM, Dependabot);
 - GitHub Actions static and operational health;
 - stale/local-only branch and worktree preservation risks;
 - deterministic correlation, deduplication, completeness, and reports.

@@ -8,6 +8,7 @@ from repo_assurance.core.findings import materialize_findings
 from repo_assurance.evaluators.cicd_operational import evaluate_ci_operational
 from repo_assurance.evaluators.cicd_static import evaluate_ci_static
 from repo_assurance.evaluators.governance import evaluate_governance
+from repo_assurance.evaluators.github_security import evaluate_github_security
 from repo_assurance.evaluators.hygiene import evaluate_hygiene
 
 NOW = datetime(2026, 10, 2, 12, 0, tzinfo=timezone.utc)
@@ -263,3 +264,30 @@ def test_retiring_runner_materializes_deprecation_risk() -> None:
     findings = canonicalize(results, [source])
 
     assert [item["type"] for item in findings] == ["DEPRECATION_RISK"]
+
+def test_historical_only_code_scanning_materializes_canonical_finding() -> None:
+    analyses = github_evidence(
+        "ev_github_code_scanning_analyses",
+        {
+            "access_state": "AVAILABLE",
+            "analyses": [{
+                "id": 9,
+                "commit_sha": "b" * 40,
+                "ref": "refs/heads/main",
+                "error": "",
+                "tool": {"name": "CodeQL", "version": "2.27.1"},
+            }],
+        },
+    )
+
+    results = evaluate_github_security([analyses])
+    coverage = next(
+        item for item in results if item["control_id"] == "GH-SEC-001"
+    )
+    assert coverage["state"] == "FINDING"
+
+    findings = canonicalize(results, [analyses])
+
+    assert len(findings) == 1
+    assert findings[0]["control_ids"] == ["GH-SEC-001"]
+    assert findings[0]["output_class"] == "FINDING"

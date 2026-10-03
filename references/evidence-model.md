@@ -50,3 +50,16 @@ CI-STATIC-001 uses actionlint as first-class execution evidence.
 - Stored diagnostics keep message/path/line/column/kind metadata but omit source snippets.
 - Missing actionlint is explicit UNAVAILABLE evidence; execution/parsing failures are UNKNOWN_ERROR.
 - CI-STATIC-001 reaches PASS only when every specialist workflow result is PASS.
+
+## GitHub-native security and dependency evidence
+
+GitHub security/dependency controls use live GitHub API evidence and preserve permission visibility explicitly.
+
+- Code scanning analyses retain exact commit SHA, ref, tool/version, category, result/rule counts, and analysis error state.
+- Code scanning PASS for target coverage requires a successful analysis of the exact audited commit. Historical analysis alone is not target coverage.
+- Code scanning and Dependabot alert collectors expose open alert metadata; an empty visible alert list means no open GitHub alerts were returned, not that no vulnerability exists outside the observed coverage.
+- Secret scanning alert collection filters at the gh CLI boundary and stores alert metadata only. Secret values are never requested into canonical evidence.
+- Repository security_and_analysis state is normalized to status fields only.
+- Dependency graph/SBOM evidence records inventory metadata/counts rather than reproducing the full SBOM.
+- UNKNOWN_PERMISSION, entitlement gaps, malformed responses, and unavailable surfaces remain explicit and prevent a verified-domain claim.
+- Dependabot findings use stable advisory subjects such as GHSA-* where available so later provider adapters can correlate equivalent vulnerability evidence.

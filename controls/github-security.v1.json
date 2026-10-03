@@ -1,0 +1,90 @@
+{
+  "schema_version": "control-catalog/v1",
+  "domain": "github-security",
+  "controls": [
+    {
+      "schema_version": "control/v1",
+      "id": "GH-SEC-001",
+      "title": "Code scanning covers the audited target",
+      "domain": "github-security",
+      "description": "GitHub code scanning has a successful analysis for the exact audited commit.",
+      "evaluator": "github_security.code_scanning_coverage",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["github_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": false,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "GH-SEC-002",
+      "title": "Code scanning alert visibility is evaluated",
+      "domain": "github-security",
+      "description": "Open GitHub code scanning alerts are evaluated without treating incomplete visibility as an empty alert inventory.",
+      "evaluator": "github_security.code_scanning_alerts",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["github_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    },
+    {
+      "schema_version": "control/v1",
+      "id": "GH-SEC-003",
+      "title": "Secret scanning and push protection are effective",
+      "domain": "github-security",
+      "description": "Secret scanning, push protection, and open alert visibility are evaluated without exposing secret values.",
+      "evaluator": "github_security.secret_scanning",
+      "applicability": {
+        "all_capabilities": ["github"],
+        "any_capabilities": [],
+        "excluded_repository_types": []
+      },
+      "evidence_requirements": {
+        "minimum_kinds": ["github_state"],
+        "minimum_items": 1
+      },
+      "evaluation": {
+        "time_sensitive": false,
+        "correlation_required": true,
+        "dynamic_execution": false
+      },
+      "outputs": {
+        "allowed_states": [
+          "PASS", "FINDING", "NOT_APPLICABLE", "NOT_ENABLED",
+          "UNAVAILABLE", "UNKNOWN_PERMISSION", "UNKNOWN_ERROR", "INCONCLUSIVE"
+        ]
+      }
+    }
+  ]
+}

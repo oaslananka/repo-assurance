@@ -33,6 +33,13 @@ from repo_assurance.collectors.github_actions import (
     collect_workflow_history,
     collect_workflows,
 )
+from repo_assurance.collectors.github_security import (
+    collect_code_scanning_alerts,
+    collect_code_scanning_analyses,
+    collect_dependency_sbom,
+    collect_dependabot_alerts,
+    collect_secret_scanning_alerts,
+)
 from repo_assurance.core.catalog import load_catalog, validate_catalog_document
 from repo_assurance.core.completeness import compute_domain_coverage
 from repo_assurance.core.correlation import correlate
@@ -51,6 +58,7 @@ from repo_assurance.evaluators.cicd_static import (
     evaluate_ci_static,
 )
 from repo_assurance.evaluators.governance import evaluate_governance
+from repo_assurance.evaluators.github_security import evaluate_github_security
 from repo_assurance.evaluators.hygiene import evaluate_hygiene
 from repo_assurance.evaluators.repository import (
     discover_repository_profile,
@@ -180,6 +188,19 @@ def _governance_evidence(repository: str, branch: str, sha: str) -> list[dict[st
         *collect_rulesets(repository, sha),
         *branch_state,
         *collect_commit_checks(repository, sha),
+    ]
+
+
+def _github_security_evidence(
+    repository: str,
+    sha: str,
+) -> list[dict[str, Any]]:
+    return [
+        *collect_code_scanning_analyses(repository, sha),
+        *collect_code_scanning_alerts(repository, sha),
+        *collect_secret_scanning_alerts(repository, sha),
+        *collect_dependency_sbom(repository, sha),
+        *collect_dependabot_alerts(repository, sha),
     ]
 
 
@@ -348,6 +369,12 @@ def _audit(
         governance = _governance_evidence(full_name, target_branch, target_sha)
         evidence.extend(governance)
         control_results.extend(evaluate_governance(governance))
+
+        security_evidence = _github_security_evidence(full_name, target_sha)
+        evidence.extend(security_evidence)
+        control_results.extend(
+            evaluate_github_security([*governance, *security_evidence])
+        )
 
         if profile.get("github_actions"):
             budget = plan["budgets"]["github"]
