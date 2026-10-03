@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,10 @@ def _schema_dir() -> Path:
     override = os.environ.get("REPO_ASSURANCE_SCHEMA_DIR")
     if override:
         return Path(override)
-    return Path(__file__).resolve().parents[3] / "schemas"
+    source_directory = Path(__file__).resolve().parents[3] / "schemas"
+    if source_directory.is_dir():
+        return source_directory
+    return Path(sys.prefix) / "share" / "repo-assurance" / "schemas"
 
 
 def load_schema(name: str) -> dict[str, Any]:
